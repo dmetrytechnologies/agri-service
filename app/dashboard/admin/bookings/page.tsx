@@ -143,7 +143,7 @@ export default function AllBookingsPage() {
     const getAvailableOperators = (booking: any) => {
         const exactMatch = operators.filter((op: Operator) =>
             op.service_pincodes.includes(booking.pincode) &&
-            op.available_dates.includes(booking.date)
+            op.available_dates?.includes(booking.date)
         );
         if (exactMatch.length > 0) return { type: 'Perfect Match', ops: exactMatch };
 
