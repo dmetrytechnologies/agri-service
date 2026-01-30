@@ -21,14 +21,16 @@ import {
     Globe,
     Edit,
     Filter,
-    ArrowUpDown
+    ArrowUpDown,
+    Home,
+    Map as MapIcon
 } from 'lucide-react';
 
 export default function AllBookingsPage() {
-    const { bookings, addBooking, updateBooking, assignOperator, isLoading: isBookingsLoading } = useBookings();
+    const { bookings, farmers, addBooking, updateBooking, assignOperator, isLoading: isBookingsLoading } = useBookings();
     const { operators, isLoading: isOperatorsLoading } = useOperators();
 
-    const [filter, setFilter] = useState<'All' | 'Pending' | 'Assigned' | 'Completed'>('All');
+    const [filter, setFilter] = useState<'All' | 'pending' | 'assigned' | 'completed'>('All');
     const [dateFilter, setDateFilter] = useState('');
     const [monthFilter, setMonthFilter] = useState('');
     const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
@@ -38,14 +40,31 @@ export default function AllBookingsPage() {
     const [isManualModalOpen, setIsManualModalOpen] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [isFilterOpen, setIsFilterOpen] = useState(false);
+    const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+    const [assigningBooking, setAssigningBooking] = useState<any>(null);
+    const [matchingResults, setMatchingResults] = useState<any>(null);
+    const [isMatchingLoading, setIsMatchingLoading] = useState(false);
     const [newManualBooking, setNewManualBooking] = useState({
         farmerName: '',
         phone: '',
         crop: '',
         acres: '',
         pincode: '',
+        location: '',
         date: new Date().toISOString().split('T')[0]
     });
+
+    const handleFarmerSelect = (farmerId: string) => {
+        const farmer = farmers.find(f => f.id === farmerId);
+        if (farmer) {
+            setNewManualBooking(prev => ({
+                ...prev,
+                farmerName: farmer.name,
+                phone: farmer.phone,
+                pincode: farmer.pincode
+            }));
+        }
+    };
 
     const handleManualSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -83,6 +102,7 @@ export default function AllBookingsPage() {
             crop: '',
             acres: '',
             pincode: '',
+            location: '',
             date: new Date().toISOString().split('T')[0]
         });
     };
@@ -102,6 +122,25 @@ export default function AllBookingsPage() {
 
     const handleAssign = (id: string, operatorName: string) => {
         assignOperator(id, operatorName);
+        setIsAssignModalOpen(false);
+        setAssigningBooking(null);
+    };
+
+    const openAssignModal = async (booking: any) => {
+        setAssigningBooking(booking);
+        setIsAssignModalOpen(true);
+        setIsMatchingLoading(true);
+        setMatchingResults(null);
+
+        try {
+            const res = await fetch(`/api/admin/jobs/${booking.id}/matches`);
+            const data = await res.json();
+            setMatchingResults(data);
+        } catch (error) {
+            console.error('Error fetching matches:', error);
+        } finally {
+            setIsMatchingLoading(false);
+        }
     };
 
     const copyToWhatsApp = (booking: any) => {
@@ -143,16 +182,27 @@ export default function AllBookingsPage() {
     const getAvailableOperators = (booking: any) => {
         const exactMatch = operators.filter((op: Operator) =>
             op.service_pincodes.includes(booking.pincode) &&
-            op.available_dates?.includes(booking.date)
+            op.available_dates?.includes(booking.date) &&
+            op.status !== 'Off-Duty'
         );
         if (exactMatch.length > 0) return { type: 'Perfect Match', ops: exactMatch };
 
+        // 2. Village Match (New Priority)
+        const villageMatch = operators.filter((op: Operator) =>
+            booking.village &&
+            op.service_villages?.some(v => v.toLowerCase() === booking.village?.toLowerCase()) &&
+            op.status !== 'Off-Duty'
+        );
+        if (villageMatch.length > 0) return { type: 'Village Match', ops: villageMatch };
+
         const pinMatch = operators.filter((op: Operator) =>
-            op.service_pincodes.includes(booking.pincode)
+            op.service_pincodes.includes(booking.pincode) &&
+            op.status !== 'Off-Duty'
         );
         if (pinMatch.length > 0) return { type: 'PIN Match', ops: pinMatch };
 
-        return { type: 'All Pilots', ops: operators };
+        const allActiveOps = operators.filter((op: Operator) => op.status !== 'Off-Duty');
+        return { type: 'All Pilots', ops: allActiveOps };
     };
 
     const isLoading = isBookingsLoading || isOperatorsLoading;
@@ -250,7 +300,7 @@ export default function AllBookingsPage() {
                         <div className="space-y-1.5">
                             <label className="text-[10px] font-black text-[var(--muted)] uppercase tracking-widest pl-1">Status</label>
                             <div className="flex bg-white/5 p-1 rounded-xl border border-white/10">
-                                {(['All', 'Pending', 'Assigned', 'Completed'] as const).map((f) => (
+                                {(['All', 'pending', 'assigned', 'completed'] as const).map((f) => (
                                     <button
                                         key={f}
                                         onClick={() => setFilter(f)}
@@ -300,25 +350,35 @@ export default function AllBookingsPage() {
                                                     >
                                                         {b.id}
                                                     </button>
-                                                    {b.isManual && (
-                                                        <button
-                                                            onClick={() => openEditModal(b)}
-                                                            className="p-1 text-emerald-500 hover:bg-emerald-500/10 rounded transition-colors"
-                                                            title="Edit Manual Booking"
-                                                        >
-                                                            <Edit className="h-3.5 w-3.5" />
-                                                        </button>
-                                                    )}
+                                                    <button
+                                                        onClick={() => openEditModal(b)}
+                                                        className="p-1 text-emerald-500 hover:bg-emerald-500/10 rounded transition-colors"
+                                                        title="Edit Booking"
+                                                    >
+                                                        <Edit className="h-3.5 w-3.5" />
+                                                    </button>
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4">
                                                 <div className="flex flex-col">
-                                                    <span className="font-bold text-[var(--foreground)]">{b.farmerName}</span>
+                                                    <span className="font-bold text-[var(--foreground)] flex items-center gap-2">
+                                                        {b.farmerName}
+                                                        {b.farmerName.includes('IVR Lead') && (
+                                                            <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-500 text-[9px] uppercase tracking-widest border border-amber-500/20">
+                                                                Lead
+                                                            </span>
+                                                        )}
+                                                    </span>
                                                     <span className="text-xs text-[var(--muted)] font-mono">{b.phone}</span>
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4">
                                                 <div className="flex flex-col gap-1 items-start">
+                                                    {b.village && (
+                                                        <span className="flex items-center gap-1.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded text-[10px] font-black uppercase border border-blue-500/20">
+                                                            <Home className="h-3 w-3" /> {b.village}
+                                                        </span>
+                                                    )}
                                                     <span className="flex items-center gap-1.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded text-[10px] font-black uppercase border border-emerald-500/20">
                                                         <MapPin className="h-3 w-3" /> PIN: {b.pincode}
                                                     </span>
@@ -328,8 +388,8 @@ export default function AllBookingsPage() {
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4">
-                                                <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ring-1 ring-inset ${b.status === 'Completed' ? 'bg-green-500/10 text-green-600 dark:text-green-400 ring-green-500/20' :
-                                                    b.status === 'Assigned' ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 ring-blue-500/20' :
+                                                <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ring-1 ring-inset ${b.status === 'completed' ? 'bg-green-500/10 text-green-600 dark:text-green-400 ring-green-500/20' :
+                                                    b.status === 'assigned' ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 ring-blue-500/20' :
                                                         'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 ring-yellow-500/20'
                                                     }`}>
                                                     {b.status}
@@ -358,26 +418,13 @@ export default function AllBookingsPage() {
                                                 )}
                                             </td>
                                             <td className="px-6 py-4">
-                                                {b.status === 'Pending' ? (
-                                                    <div className="flex flex-col gap-1">
-                                                        <div className="relative">
-                                                            <select
-                                                                className="glass-input h-9 text-xs py-1 pr-8 w-full font-bold"
-                                                                onChange={(e) => handleAssign(b.id, e.target.value)}
-                                                                defaultValue=""
-                                                            >
-                                                                <option value="" disabled>{suitableOps.type} ({suitableOps.ops.length})</option>
-                                                                {suitableOps.ops.map((op: Operator) => (
-                                                                    <option key={op.id} value={op.name} className="text-black">
-                                                                        {op.name} {suitableOps.type === 'All Pilots' ? `(${op.location})` : ''}
-                                                                    </option>
-                                                                ))}
-                                                            </select>
-                                                        </div>
-                                                        {suitableOps.type === 'All Pilots' && (
-                                                            <p className="text-[9px] text-amber-500 font-bold bg-amber-500/10 p-1 rounded mt-1 text-center">No local match - showing all</p>
-                                                        )}
-                                                    </div>
+                                                {b.status === 'pending' ? (
+                                                    <button
+                                                        onClick={() => openAssignModal(b)}
+                                                        className="glass-button glass-button-primary text-[10px] py-2 px-4 font-black flex items-center gap-2"
+                                                    >
+                                                        <UserCircle className="h-3.5 w-3.5" /> ASSIGN PILOT
+                                                    </button>
                                                 ) : (
                                                     <div className="flex justify-center">
                                                         <CheckCircle className="h-5 w-5 text-green-500" />
@@ -438,8 +485,8 @@ export default function AllBookingsPage() {
                                         <Activity className="h-4 w-4 text-[var(--muted)]" />
                                         <div>
                                             <p className="text-[10px] font-black text-[var(--muted)] uppercase tracking-widest">Field Status</p>
-                                            <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${selectedBooking.status === 'Completed' ? 'bg-green-500/10 text-green-600' :
-                                                selectedBooking.status === 'Assigned' ? 'bg-blue-500/10 text-blue-600' : 'bg-yellow-500/10 text-yellow-600'
+                                            <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${selectedBooking.status === 'completed' ? 'bg-green-500/10 text-green-600' :
+                                                selectedBooking.status === 'assigned' ? 'bg-blue-500/10 text-blue-600' : 'bg-yellow-500/10 text-yellow-600'
                                                 }`}>
                                                 {selectedBooking.status}
                                             </span>
@@ -479,6 +526,23 @@ export default function AllBookingsPage() {
                             </div>
 
                             <form onSubmit={handleManualSubmit} className="space-y-5">
+                                {!editingId && farmers && farmers.length > 0 && (
+                                    <div className="space-y-2 pb-4 border-b border-white/10">
+                                        <label className="text-xs font-bold text-[var(--primary)] uppercase tracking-widest">Select Registered Farmer (Optional)</label>
+                                        <select
+                                            className="glass-input !h-12 !py-2 px-4 text-[var(--foreground)] bg-transparent border-white/20"
+                                            onChange={(e) => handleFarmerSelect(e.target.value)}
+                                            defaultValue=""
+                                        >
+                                            <option value="" disabled className="text-gray-500 bg-[var(--glass-bg)] dark:bg-slate-900">Select a farmer...</option>
+                                            {farmers.map(f => (
+                                                <option key={f.id} value={f.id} className="text-[var(--foreground)] bg-white dark:bg-slate-800">
+                                                    {f.name} - {f.village || f.pincode}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
                                 <div className="space-y-2">
                                     <label className="text-xs font-bold text-[var(--primary)] uppercase tracking-widest">Farmer Name</label>
                                     <div className="relative">
@@ -519,6 +583,19 @@ export default function AllBookingsPage() {
                                                 onChange={e => setNewManualBooking({ ...newManualBooking, pincode: e.target.value.replace(/\D/g, '').slice(0, 6) })}
                                             />
                                         </div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-[var(--primary)] uppercase tracking-widest">Address / Village (For Leads)</label>
+                                    <div className="relative">
+                                        <MapIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--muted)]" />
+                                        <input
+                                            className="glass-input pl-10"
+                                            placeholder="Village / Location"
+                                            value={newManualBooking.location}
+                                            onChange={e => setNewManualBooking({ ...newManualBooking, location: e.target.value })}
+                                        />
                                     </div>
                                 </div>
 
@@ -583,6 +660,110 @@ export default function AllBookingsPage() {
                     </div>
                 )
             }
+            {/* ASSIGN PILOT MODAL */}
+            {isAssignModalOpen && assigningBooking && (
+                <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={() => setIsAssignModalOpen(false)} />
+                    <div className="relative w-full max-w-2xl glass-card p-6 md:p-8 rounded-[2rem] shadow-2xl border border-white/20 animate-in zoom-in duration-300 max-h-[90vh] overflow-hidden flex flex-col">
+                        <div className="flex justify-between items-start mb-6">
+                            <div>
+                                <h2 className="text-2xl font-black text-[var(--foreground)] italic">Assign Pilot</h2>
+                                <p className="text-sm text-[var(--muted)] font-medium">Ranking pilots for {assigningBooking.farmerName}'s request</p>
+                            </div>
+                            <button
+                                onClick={() => setIsAssignModalOpen(false)}
+                                className="p-2 text-[var(--muted)] hover:text-[var(--foreground)] transition-colors"
+                            >
+                                <X className="h-6 w-6" />
+                            </button>
+                        </div>
+
+                        {isMatchingLoading ? (
+                            <div className="py-20 text-center space-y-4">
+                                <div className="animate-spin h-10 w-10 border-4 border-[var(--primary)] border-t-transparent rounded-full mx-auto" />
+                                <p className="text-[var(--muted)] font-bold animate-pulse uppercase tracking-widest text-xs">Running Matching Engine...</p>
+                            </div>
+                        ) : matchingResults ? (
+                            <div className="overflow-y-auto pr-2 custom-scrollbar space-y-6">
+                                {/* Bucket Renderer Helper */}
+                                {(() => {
+                                    const buckets = [
+                                        { label: 'Best Match (Village + Date)', color: 'green', data: matchingResults.perfectMatches, icon: '🟢' },
+                                        { label: 'Village Match (Date Flexible)', color: 'yellow', data: matchingResults.villageMatches, icon: '🟡' },
+                                        { label: 'Pincode Match (Date Match)', color: 'orange', data: matchingResults.pincodePerfectMatches, icon: '🟠' },
+                                        { label: 'Pincode Match', color: 'orange', data: matchingResults.pincodeMatches, icon: '🟠' },
+                                        { label: 'District Match', color: 'blue', data: matchingResults.districtMatches, icon: '🔵' },
+                                        { label: 'Manual Override', color: 'red', data: matchingResults.manual, icon: '🔴' }
+                                    ];
+
+                                    return buckets.map((bucket, idx) => {
+                                        if (bucket.data.length === 0) return null;
+                                        return (
+                                            <div key={idx} className="space-y-3">
+                                                <div className="flex items-center gap-2 px-2">
+                                                    <span className="text-sm">{bucket.icon}</span>
+                                                    <h3 className={`text-xs font-black uppercase tracking-widest ${bucket.color === 'green' ? 'text-green-500' :
+                                                        bucket.color === 'yellow' ? 'text-yellow-500' :
+                                                            bucket.color === 'orange' ? 'text-orange-500' :
+                                                                bucket.color === 'blue' ? 'text-blue-500' : 'text-red-500'
+                                                        }`}>
+                                                        {bucket.label} ({bucket.data.length})
+                                                    </h3>
+                                                </div>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                    {bucket.data.map((pilot: any) => (
+                                                        <div key={pilot.id} className="glass-panel p-4 rounded-2xl border border-white/10 hover:border-[var(--primary)]/50 transition-all group relative">
+                                                            <div className="flex justify-between items-start mb-2">
+                                                                <div>
+                                                                    <p className="font-bold text-[var(--foreground)]">{pilot.name}</p>
+                                                                    <p className="text-[10px] text-[var(--muted)] font-mono">{pilot.phone}</p>
+                                                                </div>
+                                                                <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase ${pilot.status === 'Idle' ? 'bg-green-500/10 text-green-500' : 'bg-blue-500/10 text-blue-500'
+                                                                    }`}>
+                                                                    {pilot.status}
+                                                                </span>
+                                                            </div>
+
+                                                            <div className="space-y-2 mb-4">
+                                                                <div className="flex items-center gap-2 text-[10px]">
+                                                                    <MapPin className="h-3 w-3 text-[var(--primary)]" />
+                                                                    <span className="text-[var(--muted)] font-medium truncate">Villages: {(pilot.service_villages || []).slice(0, 2).join(', ')}{pilot.service_villages?.length > 2 ? '...' : ''}</span>
+                                                                </div>
+                                                                <div className="flex items-center gap-2 text-[10px]">
+                                                                    <Globe className="h-3 w-3 text-[var(--primary)]" />
+                                                                    <span className="text-[var(--muted)] font-medium">PINs: {(pilot.service_pincodes || []).join(', ')}</span>
+                                                                </div>
+                                                            </div>
+
+                                                            <button
+                                                                onClick={() => handleAssign(assigningBooking.id, pilot.name)}
+                                                                className="w-full glass-button glass-button-primary py-2 text-[10px] font-black uppercase tracking-widest shadow-md"
+                                                            >
+                                                                Assign Now
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        );
+                                    });
+                                })()}
+                            </div>
+                        ) : (
+                            <div className="py-10 text-center text-[var(--muted)] italic">No matches found.</div>
+                        )}
+
+                        <div className="mt-6 pt-4 border-t border-white/10 flex justify-end">
+                            <button
+                                onClick={() => setIsAssignModalOpen(false)}
+                                className="px-6 py-2 text-xs font-bold text-[var(--muted)] hover:text-[var(--foreground)] transition-colors"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div >
     );
 }

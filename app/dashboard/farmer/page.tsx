@@ -188,16 +188,16 @@ export default function FarmerDashboard() {
                                         </div>
 
                                         <div className="flex flex-col items-end gap-2 w-full sm:w-auto mt-2 sm:mt-0">
-                                            <span className={`px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest border backdrop-blur-md ${booking.status === 'Completed' ? 'bg-green-500/20 text-green-700 dark:text-green-300 border-green-500/30' :
-                                                    booking.status === 'Assigned' ? 'bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/30' :
-                                                        'bg-yellow-500/20 text-yellow-700 dark:text-yellow-300 border-yellow-500/30'
+                                            <span className={`px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest border backdrop-blur-md ${booking.status === 'completed' ? 'bg-green-500/20 text-green-700 dark:text-green-300 border-green-500/30' :
+                                                booking.status === 'assigned' ? 'bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/30' :
+                                                    'bg-yellow-500/20 text-yellow-700 dark:text-yellow-300 border-yellow-500/30'
                                                 }`}>
                                                 {booking.status}
                                             </span>
                                             {booking.operator && (
                                                 <p className="text-[10px] font-bold text-[var(--primary)] uppercase">Pilot: {booking.operator}</p>
                                             )}
-                                            {booking.status === 'Completed' && (
+                                            {booking.status === 'completed' && (
                                                 <div className="text-[var(--primary)] flex items-center gap-1 text-xs font-black">
                                                     <CheckCircle className="h-4 w-4" /> VERIFIED
                                                 </div>

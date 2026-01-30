@@ -21,18 +21,33 @@ import {
     Ban,
     Trash2,
     Check,
-    Phone
+    Phone,
+    Globe
 } from 'lucide-react';
+import ServiceAreaSelector from '@/components/ServiceAreaSelector';
 
 export default function OperatorsPage() {
     const { operators, addOperator, deleteOperator, editOperator, isLoading: isOperatorsLoading } = useOperators();
     const { bookings, isLoading: isBookingsLoading } = useBookings();
 
-
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedJob, setSelectedJob] = useState<any>(null);
     const [editingId, setEditingId] = useState<string | null>(null);
-    const [newOp, setNewOp] = useState({ name: '', phone: '', location: '', service_pincodes: '' });
+    const [newOp, setNewOp] = useState<{
+        name: string;
+        phone: string;
+        location: string;
+        district: string;
+        service_pincodes: string[];
+        service_villages: string[];
+    }>({
+        name: '',
+        phone: '',
+        location: '',
+        district: '',
+        service_pincodes: [],
+        service_villages: []
+    });
     const [copiedPhoneId, setCopiedPhoneId] = useState<string | null>(null);
 
     const handleCopyPhone = (phone: string, id: string) => {
@@ -51,43 +66,45 @@ export default function OperatorsPage() {
 
     const handleAddOperator = (e: React.FormEvent) => {
         e.preventDefault();
-        const pincodeArray = newOp.service_pincodes.split(',').map(p => p.trim()).filter(p => p !== '');
-
-        // Validation: Each pincode must be exactly 6 digits
-        const invalidPincodes = pincodeArray.filter(p => !/^\d{6}$/.test(p));
-        if (invalidPincodes.length > 0) {
-            alert(`Invalid Pincodes: ${invalidPincodes.join(', ')}. Each pincode must be exactly 6 digits.`);
-            return;
-        }
 
         if (editingId) {
             editOperator(editingId, {
                 name: newOp.name,
                 phone: newOp.phone,
                 location: newOp.location,
-                service_pincodes: pincodeArray.length > 0 ? pincodeArray : undefined
+                district: newOp.district,
+                service_pincodes: newOp.service_pincodes,
+                service_villages: newOp.service_villages,
+                available_dates: [new Date().toISOString().split('T')[0]]
             });
         } else {
             addOperator({
                 name: newOp.name,
                 phone: newOp.phone,
                 location: newOp.location,
-                service_pincodes: pincodeArray.length > 0 ? pincodeArray : ['600001'],
+                district: newOp.district,
+                service_pincodes: newOp.service_pincodes.length > 0 ? newOp.service_pincodes : ['600001'],
+                service_villages: newOp.service_villages,
                 available_dates: [new Date().toISOString().split('T')[0]]
             });
         }
         setIsModalOpen(false);
         setEditingId(null);
-        setNewOp({ name: '', phone: '', location: '', service_pincodes: '' });
+        setNewOp({ name: '', phone: '', location: '', district: '', service_pincodes: [], service_villages: [] });
     };
 
     const openEditModal = (op: any) => {
         setEditingId(op.id);
+        const pincodes = Array.isArray(op.service_pincodes) ? op.service_pincodes : (op.service_pincodes ? [op.service_pincodes] : []);
+        const villages = Array.isArray(op.service_villages) ? op.service_villages : (op.service_villages ? [op.service_villages] : []);
+
         setNewOp({
             name: op.name,
             phone: op.phone,
             location: op.location,
-            service_pincodes: Array.isArray(op.service_pincodes) ? op.service_pincodes.join(', ') : op.service_pincodes || ''
+            district: op.district || '',
+            service_pincodes: pincodes,
+            service_villages: villages
         });
         setIsModalOpen(true);
     };
@@ -95,7 +112,7 @@ export default function OperatorsPage() {
     const handleCloseModal = () => {
         setIsModalOpen(false);
         setEditingId(null);
-        setNewOp({ name: '', phone: '', location: '', service_pincodes: '' });
+        setNewOp({ name: '', phone: '', location: '', district: '', service_pincodes: [], service_villages: [] });
     };
 
     const isLoading = isOperatorsLoading || isBookingsLoading;
@@ -111,7 +128,7 @@ export default function OperatorsPage() {
                 <button
                     onClick={() => {
                         setEditingId(null);
-                        setNewOp({ name: '', phone: '', location: '', service_pincodes: '' });
+                        setNewOp({ name: '', phone: '', location: '', district: '', service_pincodes: [], service_villages: [] });
                         setIsModalOpen(true);
                     }}
                     className="glass-button glass-button-primary flex items-center justify-center gap-2 w-full md:w-auto py-3 md:py-2"
@@ -166,6 +183,14 @@ export default function OperatorsPage() {
                                     </span>
                                     <span className="font-bold text-[var(--foreground)]">{op.location}</span>
                                 </div>
+                                {op.district && (
+                                    <div className="flex items-center justify-between text-sm">
+                                        <span className="text-[var(--muted)] flex items-center gap-2 text-[10px] uppercase font-bold tracking-tighter">
+                                            <Shield className="h-3 w-3" /> District
+                                        </span>
+                                        <span className="font-bold text-[var(--foreground)]">{op.district}</span>
+                                    </div>
+                                )}
                                 <div className="flex flex-col gap-1.5">
                                     <span className="text-[var(--muted)] text-[10px] uppercase font-black tracking-widest">Assigned Tasks ({assignedJobs.length})</span>
                                     {assignedJobs.length > 0 ? (
@@ -181,7 +206,7 @@ export default function OperatorsPage() {
                                                         <span className="text-[9px] text-[var(--muted)] font-bold uppercase tracking-tighter">{job.id}</span>
                                                     </div>
                                                     <div className="flex items-center gap-1">
-                                                        {job.status === 'Completed' ? (
+                                                        {job.status === 'completed' ? (
                                                             <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
                                                         ) : (
                                                             <Clock className="h-3.5 w-3.5 text-blue-500" />
@@ -239,7 +264,7 @@ export default function OperatorsPage() {
                             <div className="flex justify-between p-4 bg-white/5 border border-white/10 rounded-2xl">
                                 <div>
                                     <p className="text-[10px] font-black text-[var(--muted)] uppercase tracking-widest mb-1">Crop Type</p>
-                                    <p className="font-bold text-[var(--foreground)]">{selectedJob.cropType}</p>
+                                    <p className="font-bold text-[var(--foreground)]">{selectedJob.crop}</p>
                                 </div>
                                 <div className="text-right">
                                     <p className="text-[10px] font-black text-[var(--muted)] uppercase tracking-widest mb-1">Land Size</p>
@@ -266,7 +291,7 @@ export default function OperatorsPage() {
                                     <Activity className="h-4 w-4 text-[var(--muted)]" />
                                     <div>
                                         <p className="text-[10px] font-black text-[var(--muted)] uppercase tracking-widest">Field Status</p>
-                                        <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${selectedJob.status === 'Completed' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
+                                        <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${selectedJob.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
                                             }`}>
                                             {selectedJob.status}
                                         </span>
@@ -330,30 +355,39 @@ export default function OperatorsPage() {
                                     </div>
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-xs font-bold text-[var(--primary)] uppercase tracking-widest">Base</label>
+                                    <label className="text-xs font-bold text-[var(--primary)] uppercase tracking-widest">District</label>
                                     <div className="relative">
-                                        <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--muted)]" />
+                                        <Shield className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--muted)]" />
                                         <input
                                             required
                                             className="glass-input pl-10"
-                                            placeholder="Zone/Block"
-                                            value={newOp.location}
-                                            onChange={e => setNewOp({ ...newOp, location: e.target.value })}
+                                            placeholder="e.g. Coimbatore"
+                                            value={newOp.district}
+                                            onChange={e => setNewOp({ ...newOp, district: e.target.value })}
                                         />
                                     </div>
                                 </div>
                             </div>
 
                             <div className="space-y-2">
-                                <label className="text-xs font-bold text-[var(--primary)] uppercase tracking-widest">Service Pincodes</label>
-                                <input
-                                    required
-                                    className="glass-input font-mono text-sm"
-                                    placeholder="600001, 600002"
-                                    value={newOp.service_pincodes}
-                                    onChange={e => setNewOp({ ...newOp, service_pincodes: e.target.value })}
-                                />
+                                <label className="text-xs font-bold text-[var(--primary)] uppercase tracking-widest">Base/Location</label>
+                                <div className="relative">
+                                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--muted)]" />
+                                    <input
+                                        required
+                                        className="glass-input pl-10"
+                                        placeholder="Zone/Block"
+                                        value={newOp.location}
+                                        onChange={e => setNewOp({ ...newOp, location: e.target.value })}
+                                    />
+                                </div>
                             </div>
+
+                            <ServiceAreaSelector
+                                onUpdate={(data) => setNewOp(prev => ({ ...prev, service_pincodes: data.pincodes, service_villages: data.villages }))}
+                                initialPincodes={newOp.service_pincodes}
+                                initialVillages={newOp.service_villages}
+                            />
 
                             <div className="pt-4 flex gap-4">
                                 <button

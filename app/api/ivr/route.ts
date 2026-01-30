@@ -1,119 +1,59 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
+import { NextResponse } from 'next/server';
 
-// Helper to generate TwiML response
-function generateTwiML(content: string) {
-    const xml = `<?xml version="1.0" encoding="UTF-8"?><Response>${content}</Response>`;
-    return new NextResponse(xml, {
-        headers: {
-            'Content-Type': 'text/xml',
-        },
-    });
-}
+// Server-side Supabase client for IVR (Uses Service Role to bypass RLS)
+const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY! // MUST BE SET IN ENV
+);
 
-export async function POST(req: NextRequest) {
+export async function POST(request: Request) {
     try {
-        // Parse form data from IVR provider
-        const formData = await req.formData();
-        const caller = formData.get('Caller') as string;
-        const callSid = formData.get('CallSid') as string;
-        const digits = formData.get('Digits') as string;
+        const formData = await request.formData();
+        const Caller = formData.get('From') as string; // Twilio format: +919999999999
 
-        if (!callSid || !caller) {
-            return NextResponse.json({ error: 'Missing CallSid or Caller' }, { status: 400 });
+        console.log(`[IVR] Incoming call from ${Caller}`);
+
+        // 1. Normalize Phone Number (Remove +91 or +)
+        const phone = Caller ? Caller.replace(/\D/g, '').slice(-10) : '';
+
+        if (!phone) {
+            return new NextResponse(
+                `<Response><Say>Caller ID not found. Goodbye.</Say></Response>`,
+                { headers: { 'Content-Type': 'text/xml' } }
+            );
         }
 
-        // Check for existing active session (INIT state)
-        const { data: activeJob, error: fetchError } = await supabase
-            .from('jobs')
-            .select('*')
-            .eq('call_id', callSid)
-            .eq('status', 'INIT')
+        // 2. Lookup Farmer
+        const { data: farmer, error } = await supabase
+            .from('farmers')
+            .select('name')
+            .eq('phone', phone)
             .single();
 
-        // SCENARIO 1: New Call (No Digits) or unexpected input at start
-        // Action: Play Welcome Message
-        if (!digits) {
-            // We don't necessarily need to create a job here, we can wait for the first user action.
-            // But if we want to log the call start, we could.
-            // For this flow: "Farmer presses 1 -> Request drone service".
-            // So request 1: Prompt "Welcome... Press 1".
-            return generateTwiML(`
-        <Gather numDigits="1" action="/api/ivr" method="POST">
-          <Say>Welcome to DMETRY Agri Drone Service. To request drone spraying service, press 1.</Say>
-        </Gather>
-        <Say>We did not receive any input. Goodbye.</Say>
-      `);
-        }
+        // 3. Generate TwiML Response (Single Menu for Everyone)
+        const greeting = farmer ? `Welcome back, ${farmer.name}.` : 'Welcome to Agri Drone Service.';
 
-        // SCENARIO 2: User Pressed 1 (Request Service)
-        // Condition: No active job (or first step) AND Input is '1'
-        if (!activeJob && digits === '1') {
-            // Create Job in INIT state
-            const { error: insertError } = await supabase
-                .from('jobs')
-                .insert({
-                    farmer_phone: caller,
-                    status: 'INIT',
-                    source: 'IVR',
-                    call_id: callSid
-                });
+        const twiml = `
+            <Response>
+                <Say>${greeting}</Say>
+                <Gather action="/api/ivr/booking" numDigits="1" timeout="10">
+                    <Say>Press 1 to book a agriculture drone spray service.</Say>
+                </Gather>
+                <Say>We did not receive any input. Goodbye.</Say>
+            </Response>
+        `;
 
-            if (insertError) {
-                console.error('Error creating job:', insertError);
-                return generateTwiML('<Say>Sorry, an error occurred. Please try again later.</Say>');
-            }
 
-            return generateTwiML(`
-        <Gather numDigits="1" action="/api/ivr" method="POST">
-          <Say>Select your preferred service date. Press 1 for tomorrow. Press 2 for day after tomorrow. Press 3 for the next day.</Say>
-        </Gather>
-        <Say>We did not receive any input. Goodbye.</Say>
-      `);
-        }
+        return new NextResponse(twiml, {
+            headers: { 'Content-Type': 'text/xml' }
+        });
 
-        // SCENARIO 3: User Selected Date
-        // Condition: Active INIT job exists AND Input is 1/2/3
-        if (activeJob && ['1', '2', '3'].includes(digits)) {
-            const today = new Date();
-            const daysToAdd = parseInt(digits); // 1, 2, or 3
-
-            const preferredDate = new Date(today);
-            preferredDate.setDate(today.getDate() + daysToAdd);
-
-            const dateString = preferredDate.toISOString().split('T')[0]; // YYYY-MM-DD
-
-            // Update Job
-            const { error: updateError } = await supabase
-                .from('jobs')
-                .update({
-                    status: 'NEW',
-                    preferred_date: dateString
-                })
-                .eq('id', activeJob.id);
-
-            if (updateError) {
-                console.error('Error updating job:', updateError);
-                return generateTwiML('<Say>Sorry, an error occurred while saving your request.</Say>');
-            }
-
-            // Format date for speech (e.g., "January 26th")
-            const verbalDate = preferredDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
-
-            return generateTwiML(`
-        <Say>Your drone service request has been received on ${verbalDate}. Goodbye.</Say>
-        <Hangup/>
-      `);
-        }
-
-        // Fallback for Invalid Input
-        return generateTwiML(`
-      <Say>Invalid input.</Say>
-      <Redirect>/api/ivr</Redirect>
-    `);
-
-    } catch (error) {
-        console.error('IVR Error:', error);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    } catch (error: any) {
+        console.error('[IVR Error]', error);
+        return new NextResponse(
+            `<Response><Say>An error occurred. Please call back later.</Say></Response>`,
+            { headers: { 'Content-Type': 'text/xml' } }
+        );
     }
 }

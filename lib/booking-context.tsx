@@ -11,21 +11,38 @@ export interface Booking {
     date: string;
     acres: string;
     crop: string;
-    status: 'Pending' | 'Assigned' | 'Confirmed' | 'Completed' | 'Rejected';
+    status: 'pending' | 'assigned' | 'confirmed' | 'completed' | 'rejected';
     isManual?: boolean;
     operator?: string;
     location?: string;
+    village?: string;
+    district?: string;
+}
+
+export interface Farmer {
+    id: string;
+    name: string;
+    phone: string;
+    pincode: string;
+    address: string;
+    village?: string;
+    district?: string;
+    created_at?: string;
 }
 
 interface BookingContextType {
     bookings: Booking[];
+    farmers: Farmer[];
     addBooking: (booking: Omit<Booking, 'id' | 'status' | 'isManual'>) => void;
     updateBooking: (id: string, updates: Partial<Booking>) => void;
     assignOperator: (bookingId: string, operatorName: string) => void;
     updateStatus: (bookingId: string, status: Booking['status']) => void;
     rejectBooking: (bookingId: string) => void;
     confirmBooking: (bookingId: string) => void;
+    updateFarmer: (id: string, updates: Partial<Farmer>) => Promise<void>;
+    refreshData: () => Promise<void>;
     isLoading: boolean;
+
 }
 
 const BookingContext = createContext<BookingContextType | undefined>(undefined);
@@ -34,50 +51,80 @@ const DEFAULT_BOOKINGS: Booking[] = [];
 
 export function BookingProvider({ children }: { children: ReactNode }) {
     const [bookings, setBookings] = useState<Booking[]>([]);
+    const [farmers, setFarmers] = useState<Farmer[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     const fetchBookings = async () => {
         try {
-            const { data, error } = await supabase
+            // Connectivity Check
+            try {
+                const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+                if (url) {
+                    const res = await fetch(url, { method: 'HEAD', mode: 'no-cors' });
+                    console.log('Supabase connectivity check:', res.type);
+                }
+            } catch (e) {
+                console.warn('Supabase URL is unreachable:', e);
+            }
+
+            const { data: jobsData, error: jobsError } = await supabase
                 .from('jobs')
                 .select('*')
                 .order('created_at', { ascending: false });
 
-            if (error) throw error;
+            if (jobsError) throw jobsError;
 
-            if (data) {
-                // Map DB columns to frontend interface if needed
-                const mappedBookings: Booking[] = data.map((job: any) => ({
-                    id: job.id,
-                    farmerName: '', // We might need to fetch this from farmers table or store in jobs. For now assuming jobs doesn't have name directly unless joined.
-                    // Wait, the plan said "jobs has farmer_phone". We need to get name.
-                    // Option A: Join query.
-                    // Option B: Query farmers and map.
-                    // Let's do a join or simple fetch for now. To keep it simple, I'll fetch farmers too.
-                    phone: job.farmer_phone,
-                    pincode: job.pincode || '',
-                    date: job.preferred_date || '',
-                    acres: job.acres || '',
-                    crop: job.crop || '',
-                    status: job.status,
-                    isManual: job.source === 'MANUAL',
-                    operator: job.operator,
-                    location: job.location
-                }));
+            // Fetch farmers
+            const { data: farmersData, error: farmersError } = await supabase
+                .from('farmers')
+                .select('*')
+                .order('created_at', { ascending: false });
 
-                // Fetch farmer names
-                const { data: farmers } = await supabase.from('farmers').select('phone, name');
-                if (farmers) {
-                    const farmerMap = new Map(farmers.map(f => [f.phone, f.name]));
-                    mappedBookings.forEach(b => {
-                        b.farmerName = farmerMap.get(b.phone) || 'Unknown Farmer';
-                    });
-                }
+            if (farmersError) throw farmersError;
+
+            const currentFarmers = farmersData || [];
+            setFarmers(currentFarmers);
+
+            if (jobsData) {
+                const farmerPhoneMap = new Map(currentFarmers.map(f => [f.phone, f.name]));
+                const farmerIdMap = new Map(currentFarmers.map(f => [f.id, f.name]));
+
+                const mappedBookings: Booking[] = jobsData.map((job: any) => {
+                    let name = 'Unknown Farmer';
+                    if (job.farmer_id && farmerIdMap.has(job.farmer_id)) {
+                        name = farmerIdMap.get(job.farmer_id)!;
+                    } else if (job.farmer_phone && farmerPhoneMap.has(job.farmer_phone)) {
+                        name = farmerPhoneMap.get(job.farmer_phone)!;
+                    } else if (job.farmer_name) {
+                        name = job.farmer_name; // Fallback if name is denormalized in jobs table
+                    }
+
+                    return {
+                        id: job.id,
+                        farmerName: name,
+                        phone: job.farmer_phone,
+                        pincode: job.pincode || '',
+                        date: job.preferred_date || '',
+                        acres: job.acres || '',
+                        crop: job.crop || '',
+                        status: job.status,
+                        isManual: job.source === 'MANUAL',
+                        operator: job.operator,
+                        location: job.location,
+                        village: currentFarmers.find(f => f.phone === job.farmer_phone)?.village || ''
+                    };
+                });
 
                 setBookings(mappedBookings);
             }
         } catch (error: any) {
-            console.error('Error fetching bookings:', error.message || error);
+            console.error('Error fetching data:', {
+                message: error.message,
+                details: error.details,
+                hint: error.hint,
+                code: error.code,
+                fullError: error
+            });
         } finally {
             setIsLoading(false);
         }
@@ -87,55 +134,88 @@ export function BookingProvider({ children }: { children: ReactNode }) {
         fetchBookings();
 
         // Subscribe to realtime changes
-        const channel = supabase
+        const jobsChannel = supabase
             .channel('jobs_changes')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, () => {
-                fetchBookings();
-            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, () => fetchBookings())
+            .subscribe();
+
+        const farmersChannel = supabase
+            .channel('farmers_changes')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'farmers' }, () => fetchBookings())
             .subscribe();
 
         return () => {
-            supabase.removeChannel(channel);
+            supabase.removeChannel(jobsChannel);
+            supabase.removeChannel(farmersChannel);
         };
     }, []);
 
     const addBooking = async (data: Omit<Booking, 'id' | 'status' | 'isManual'>) => {
         try {
+            console.log('Attempting to add booking:', data);
+
             // 1. Ensure Farmer Exists
+            let targetFarmerId = null;
+
+            // 1. Ensure Farmer Exists and Get ID
             const { data: existingFarmer } = await supabase
                 .from('farmers')
                 .select('id')
                 .eq('phone', data.phone)
                 .single();
 
-            if (!existingFarmer) {
-                // Create new farmer
-                await supabase.from('farmers').insert({
-                    name: data.farmerName,
-                    phone: data.phone,
-                    pincode: data.pincode,
-                    address: data.location || '' // Using location as address proxy
-                });
+            if (existingFarmer) {
+                targetFarmerId = existingFarmer.id;
+            } else {
+                // Create new farmer and return ID
+                const { data: newFarmer, error: createError } = await supabase
+                    .from('farmers')
+                    .insert({
+                        name: data.farmerName,
+                        phone: data.phone,
+                        pincode: data.pincode,
+                        address: data.location || ''
+                    })
+                    .select()
+                    .single();
+
+                if (createError) {
+                    console.error('Error creating farmer:', createError);
+                    throw createError;
+                }
+                targetFarmerId = newFarmer.id;
             }
 
             // 2. Create Job
-            const { error } = await supabase.from('jobs').insert({
+            const jobPayload = {
+                farmer_id: targetFarmerId,
                 farmer_phone: data.phone,
                 preferred_date: data.date,
                 crop: data.crop,
                 acres: data.acres,
                 pincode: data.pincode,
-                location: data.location,
-                source: 'MANUAL',
-                status: 'Pending'
-            });
+                location: data.location || '', // Ensure no undefined value
+                // source: 'MANUAL',
+                status: 'pending'
+            };
 
-            if (error) throw error;
+            const { error, data: insertedJob } = await supabase
+                .from('jobs')
+                .insert(jobPayload)
+                .select()
+                .single();
+
+            if (error) {
+                console.error('Supabase Error creating job:', error);
+                throw error;
+            }
+
             fetchBookings(); // Refresh
 
         } catch (error: any) {
-            console.error('Error creating booking:', error.message || error);
-            alert('Failed to create booking. Please try again.');
+            console.error('Error creating booking:', error);
+            const errorMessage = error.message || (typeof error === 'object' ? JSON.stringify(error) : String(error));
+            alert(`Failed to create booking: ${errorMessage}`);
         }
     };
 
@@ -167,7 +247,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
         try {
             const { error } = await supabase
                 .from('jobs')
-                .update({ status: 'Assigned', operator: operatorName })
+                .update({ status: 'assigned', operator: operatorName })
                 .eq('id', bookingId);
 
             if (error) throw error;
@@ -191,11 +271,26 @@ export function BookingProvider({ children }: { children: ReactNode }) {
         }
     };
 
-    const rejectBooking = (bookingId: string) => updateStatus(bookingId, 'Rejected');
-    const confirmBooking = (bookingId: string) => updateStatus(bookingId, 'Confirmed');
+    const rejectBooking = (bookingId: string) => updateStatus(bookingId, 'rejected');
+    const confirmBooking = (bookingId: string) => updateStatus(bookingId, 'confirmed');
+
+    const updateFarmer = async (id: string, updates: Partial<Farmer>) => {
+        try {
+            const { error } = await supabase
+                .from('farmers')
+                .update(updates)
+                .eq('id', id);
+
+            if (error) throw error;
+            fetchBookings(); // Refresh farmers list
+        } catch (error: any) {
+            console.error('Error updating farmer:', error.message || error);
+            throw error;
+        }
+    };
 
     return (
-        <BookingContext.Provider value={{ bookings, addBooking, updateBooking, assignOperator, updateStatus, rejectBooking, confirmBooking, isLoading }}>
+        <BookingContext.Provider value={{ bookings, farmers, addBooking, updateBooking, assignOperator, updateStatus, rejectBooking, confirmBooking, updateFarmer, refreshData: fetchBookings, isLoading }}>
             {children}
         </BookingContext.Provider>
     );

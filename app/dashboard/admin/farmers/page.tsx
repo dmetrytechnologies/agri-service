@@ -19,35 +19,33 @@ import {
 import { CROP_OPTIONS, getCropLabel } from '@/lib/constants';
 import { useMemo, useState, useEffect } from 'react';
 
+import { supabase } from '@/lib/supabase';
+import { Trash2 } from 'lucide-react'; // Added Trash2
+
 export default function AdminFarmersPage() {
-    const { bookings, isLoading: isBookingsLoading } = useBookings();
+    const { bookings, farmers: registeredFarmers, refreshData, isLoading: isBookingsLoading } = useBookings();
     const [searchTerm, setSearchTerm] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [registeredFarmers, setRegisteredFarmers] = useState<any[]>([]);
 
-    // Sync Farmer Registry from localStorage
-    useEffect(() => {
-        const stored = localStorage.getItem('agri_farmers');
-        if (stored) {
-            setRegisteredFarmers(JSON.parse(stored));
-        }
-    }, []);
-
+    // Derived state logic
     const farmers = useMemo(() => {
         const uniqueFarmers = new Map();
 
-        // 1. Populate from Registered Farmers (The Ground Truth)
+        // 1. Populate from Global Farmers Context
         registeredFarmers.forEach(rf => {
             uniqueFarmers.set(rf.phone, {
+                id: rf.id,
                 name: rf.name,
                 phone: rf.phone,
                 pincode: rf.pincode,
                 address: rf.address || 'Not Provided',
+                village: rf.village || '',
+                district: rf.district || '',
                 history: []
             });
         });
 
-        // 2. Cross-reference with Bookings (Fill in gaps for legacy or non-registered)
+        // 2. Cross-reference with Bookings (Fill in gaps)
         bookings.forEach(b => {
             if (!uniqueFarmers.has(b.phone)) {
                 uniqueFarmers.set(b.phone, {
@@ -58,43 +56,66 @@ export default function AdminFarmersPage() {
                     history: []
                 });
             }
-            uniqueFarmers.get(b.phone).history.push({
-                id: b.id,
-                date: b.date,
-                crop: b.crop,
-                acres: b.acres,
-                status: b.status
-            });
+            if (uniqueFarmers.has(b.phone)) {
+                uniqueFarmers.get(b.phone).history.push({
+                    id: b.id,
+                    date: b.date,
+                    crop: b.crop,
+                    acres: b.acres,
+                    status: b.status
+                });
+            }
         });
 
-        return Array.from(uniqueFarmers.values()).filter(f =>
+        return Array.from(uniqueFarmers.values()).filter((f: any) =>
             f.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             f.phone.includes(searchTerm) ||
             f.pincode.includes(searchTerm)
         );
     }, [bookings, registeredFarmers, searchTerm]);
 
-    const handleAddFarmer = (e: React.FormEvent<HTMLFormElement>) => {
+    const handleAddFarmer = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         const formData = new FormData(e.currentTarget);
         const newFarmer = {
-            name: formData.get('name'),
-            phone: formData.get('phone'),
-            pincode: formData.get('pincode'),
-            address: formData.get('address'),
-            createdAt: new Date().toISOString()
+            name: formData.get('name') as string,
+            phone: formData.get('phone') as string,
+            pincode: formData.get('pincode') as string,
+            address: formData.get('address') as string,
+            village: formData.get('village') as string,
+            district: formData.get('district') as string,
         };
 
-        const existing = [...registeredFarmers];
-        if (existing.find(f => f.phone === newFarmer.phone)) {
-            alert("Farmer with this phone is already registered.");
-            return;
-        }
+        try {
+            const { error } = await supabase.from('farmers').insert([newFarmer]);
+            if (error) {
+                if (error.code === '23505') { // Unique violation
+                    alert("Farmer with this phone is already registered.");
+                } else {
+                    throw error;
+                }
+                return;
+            }
 
-        const updated = [...existing, newFarmer];
-        localStorage.setItem('agri_farmers', JSON.stringify(updated));
-        setRegisteredFarmers(updated);
-        setIsModalOpen(false);
+            await refreshData(); // Refresh list
+            setIsModalOpen(false);
+        } catch (error: any) {
+            console.error("Error adding farmer:", error);
+            alert(`Failed to register farmer: ${error.message || 'Unknown error'}`);
+        }
+    };
+
+    const handleDeleteFarmer = async (phone: string, name: string) => {
+        if (!confirm(`Are you sure you want to delete ${name}? This cannot be undone.`)) return;
+
+        try {
+            const { error } = await supabase.from('farmers').delete().eq('phone', phone);
+            if (error) throw error;
+            await refreshData(); // Refresh list
+        } catch (error) {
+            console.error("Error deleting farmer:", error);
+            alert("Failed to delete farmer.");
+        }
     };
 
     if (isBookingsLoading) return <div className="p-8 text-center font-bold text-[var(--muted)] uppercase tracking-widest">Syncing Farmer Directory...</div>;
@@ -132,16 +153,25 @@ export default function AdminFarmersPage() {
                         <p className="text-[var(--muted)] italic">No farmers found matching your search.</p>
                     </div>
                 ) : (
-                    farmers.map((farmer) => (
+                    farmers.map((farmer: any) => (
                         <div key={farmer.phone} className="group relative">
                             <div className="glass-card p-6 flex flex-col h-full hover:translate-y-[-4px] hover:shadow-xl hover:bg-white/30 transition-all duration-300">
                                 <div className="flex items-start justify-between mb-6">
                                     <div className="glass-icon-btn h-16 w-16 text-[var(--primary)] font-black text-2xl">
                                         {farmer.name.charAt(0)}
                                     </div>
-                                    <div className="text-right">
-                                        <p className="text-[10px] font-black text-[var(--muted)] uppercase tracking-widest mb-1">Total Bookings</p>
-                                        <p className="text-2xl font-black text-[var(--foreground)]">{farmer.history.length}</p>
+                                    <div className="flex flex-col items-end gap-2">
+                                        <button
+                                            onClick={() => handleDeleteFarmer(farmer.phone, farmer.name)}
+                                            className="p-2 text-red-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
+                                            title="Delete Farmer"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </button>
+                                        <div className="text-right">
+                                            <p className="text-[10px] font-black text-[var(--muted)] uppercase tracking-widest mb-1">Total Bookings</p>
+                                            <p className="text-2xl font-black text-[var(--foreground)]">{farmer.history.length}</p>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -154,9 +184,12 @@ export default function AdminFarmersPage() {
 
                                 <div className="mt-auto space-y-4 pt-6 border-t border-white/10">
                                     <div className="flex items-center justify-between text-xs">
-                                        <span className="flex items-center gap-1.5 text-[var(--muted)] font-black uppercase tracking-tighter">
-                                            <MapPin className="h-3 w-3" /> Primary PIN
-                                        </span>
+                                        <div className="flex flex-col gap-0.5">
+                                            <span className="flex items-center gap-1.5 text-[var(--muted)] font-black uppercase tracking-tighter">
+                                                <MapPin className="h-3 w-3" /> {farmer.village || 'Village N/A'}
+                                            </span>
+                                            <span className="text-[10px] text-[var(--muted)] pl-4.5">{farmer.district || farmer.address}</span>
+                                        </div>
                                         <span className="font-bold text-[var(--foreground)] bg-white/10 px-2 py-0.5 rounded-lg shadow-inner">{farmer.pincode}</span>
                                     </div>
 
@@ -230,8 +263,18 @@ export default function AdminFarmersPage() {
                                         <input name="pincode" required maxLength={6} className="glass-input h-14 font-bold" placeholder="500001" />
                                     </div>
                                     <div className="space-y-1.5">
-                                        <label className="text-[10px] font-black text-[var(--primary)] uppercase tracking-widest ml-1">Village/Area</label>
-                                        <input name="address" required className="glass-input h-14 font-bold" placeholder="Village Name" />
+                                        <label className="text-[10px] font-black text-[var(--primary)] uppercase tracking-widest ml-1">Location</label>
+                                        <input name="address" required className="glass-input h-14 font-bold" placeholder="Address / Landmark" />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black text-[var(--primary)] uppercase tracking-widest ml-1">Village</label>
+                                        <input name="village" required className="glass-input h-14 font-bold" placeholder="Village Name" />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black text-[var(--primary)] uppercase tracking-widest ml-1">District</label>
+                                        <input name="district" required className="glass-input h-14 font-bold" placeholder="District" />
                                     </div>
                                 </div>
                             </div>

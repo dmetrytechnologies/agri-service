@@ -10,7 +10,9 @@ export interface Operator {
     status: 'Idle' | 'In-Field' | 'Off-Duty';
     jobsCompleted: number;
     location: string;
+    district?: string;
     service_pincodes: string[];
+    service_villages?: string[]; // Optional to support legacy data
     available_dates?: string[];
 }
 
@@ -25,7 +27,6 @@ interface OperatorContextType {
 
 const OperatorContext = createContext<OperatorContextType | undefined>(undefined);
 
-const DEFAULT_OPERATORS: Operator[] = [];
 
 export function OperatorProvider({ children }: { children: ReactNode }) {
     const [operators, setOperators] = useState<Operator[]>([]);
@@ -71,7 +72,10 @@ export function OperatorProvider({ children }: { children: ReactNode }) {
                     name: data.name,
                     phone: data.phone,
                     location: data.location,
+                    district: data.district,
                     service_pincodes: data.service_pincodes,
+                    service_villages: data.service_villages || [],
+                    available_dates: data.available_dates || [],
                     jobs_completed: 0,
                     status: 'Idle'
                 });
@@ -79,8 +83,8 @@ export function OperatorProvider({ children }: { children: ReactNode }) {
             if (error) throw error;
             // fetchOperators() is called automatically via subscription, or we can call it manually to be safe
             fetchOperators();
-        } catch (error) {
-            console.error('Error adding operator:', error);
+        } catch (error: any) {
+            console.error('Error adding operator:', error.message || error);
             alert('Failed to add operator. Please try again.');
         }
     };
@@ -122,7 +126,10 @@ export function OperatorProvider({ children }: { children: ReactNode }) {
                     name: data.name,
                     phone: data.phone,
                     location: data.location,
-                    service_pincodes: data.service_pincodes
+                    district: data.district,
+                    service_pincodes: data.service_pincodes,
+                    service_villages: data.service_villages,
+                    available_dates: data.available_dates
                 })
                 .eq('id', id);
 
