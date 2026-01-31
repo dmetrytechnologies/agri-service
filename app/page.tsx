@@ -105,7 +105,7 @@ export default function LoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (otp.length < 4) { // Supabase OTP is usually 6, but let's allow flexibility or check length
+    if (otp.length < 6) { // Updated to 6 digits
       setError('Please enter the OTP');
       return;
     }
@@ -122,6 +122,7 @@ export default function LoginPage() {
       // Don't reset step to phone, let them retry OTP
     }
   };
+
 
   const handleSignUpInit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -249,7 +250,7 @@ export default function LoginPage() {
                 className="glass-input text-center text-4xl font-black tracking-[0.5em] h-20 placeholder:text-gray-400/50"
                 placeholder=""
                 value={otp}
-                onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
               />
             </div>
 
