@@ -1,13 +1,19 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 
-// Uses Service Role Key for backend processing
-const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+const getSupabaseAdmin = () => {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+        throw new Error('Missing Supabase environment variables for IVR.');
+    }
+
+    return createClient(supabaseUrl, supabaseServiceKey);
+};
 
 export async function POST(request: Request) {
+    const supabase = getSupabaseAdmin();
     try {
         const formData = await request.formData();
         const Digits = formData.get('Digits') as string;

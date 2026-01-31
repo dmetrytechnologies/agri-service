@@ -1,13 +1,19 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 
-// Server-side Supabase client for IVR (Uses Service Role to bypass RLS)
-const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY! // MUST BE SET IN ENV
-);
+const getSupabaseAdmin = () => {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+        throw new Error('Missing Supabase environment variables for IVR.');
+    }
+
+    return createClient(supabaseUrl, supabaseServiceKey);
+};
 
 export async function POST(request: Request) {
+    const supabase = getSupabaseAdmin();
     try {
         const formData = await request.formData();
         const Caller = formData.get('From') as string; // Twilio format: +919999999999
