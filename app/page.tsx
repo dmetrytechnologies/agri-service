@@ -113,7 +113,7 @@ export default function LoginPage() {
     try {
       // Correctly call verifyOtp for both Login and Signup flows
       // verifyOtp in auth-context will handle profile creation if it was a signup
-      const success = await verifyOtp(phone, otp);
+      const success = await verifyOtp(phone, otp, rememberMe);
       if (!success) throw new Error('Invalid OTP');
 
       // Redirect handled by useEffect

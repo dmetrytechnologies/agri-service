@@ -18,7 +18,7 @@ interface User {
 interface AuthContextType {
   user: User | null;
   login: (phone: string) => Promise<boolean>;
-  verifyOtp: (phone: string, otp: string) => Promise<boolean>;
+  verifyOtp: (phone: string, otp: string, rememberMe?: boolean) => Promise<boolean>;
   signUp: (name: string, phone: string, role: UserRole, address?: string, pincode?: string, village?: string, district?: string, service_pincodes?: string[], service_villages?: string[]) => Promise<boolean>;
   logout: () => void;
   checkUserExists: (phone: string) => Promise<boolean>;
@@ -101,7 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const verifyOtp = async (phone: string, token: string) => {
+  const verifyOtp = async (phone: string, token: string, rememberMe: boolean = true) => {
     try {
       const { data, error } = await supabase.auth.verifyOtp({
         phone: `+91${phone}`,
@@ -112,6 +112,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) throw error;
       if (data.session?.user) {
         const userId = data.session.user.id;
+
+        // Handle "Remember Me" (Session vs Persistent Cookie)
+        if (!rememberMe) {
+          // Supabase defaults to persistent cookies. We manually convert them to session cookies
+          // by re-setting them without Max-Age/Expires.
+          // Note: This matches the default project prefix 'sb-' or typical supabase pattern.
+          if (typeof document !== 'undefined') {
+            const cookies = document.cookie.split(';');
+            cookies.forEach(cookie => {
+              const trimmed = cookie.trim();
+              if (trimmed.startsWith('sb-') && trimmed.includes('-auth-token')) {
+                const [name, value] = trimmed.split('=');
+                // Re-set as session cookie (path=/ is critical)
+                document.cookie = `${name}=${value}; path=/; samesite=lax`;
+              }
+            });
+          }
+        }
 
         // Check for pending signup data
         const pendingDataStr = localStorage.getItem('temp_signup_data');
