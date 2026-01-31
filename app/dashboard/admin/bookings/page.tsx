@@ -115,6 +115,7 @@ export default function AllBookingsPage() {
             crop: booking.crop,
             acres: booking.acres,
             pincode: booking.pincode,
+            location: booking.location || booking.address || '',
             date: booking.date
         });
         setIsManualModalOpen(true);
