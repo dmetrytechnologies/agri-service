@@ -118,7 +118,7 @@ export default function AdminOverview() {
             </div >
 
             {/* Live Operations Widget */}
-            < div className="glass-card bg-gradient-to-br from-[#1b4332]/80 to-[#081c15]/90 text-white p-8 border-none relative overflow-hidden ring-1 ring-emerald-500/20 shadow-2xl" >
+            < div className="bg-gradient-to-br from-[#1b4332]/80 to-[#081c15]/90 text-white p-8 border-none relative overflow-hidden ring-1 ring-emerald-500/20 shadow-2xl rounded-2xl" >
                 <div className="absolute top-0 right-0 p-8 opacity-10">
                     <Activity className="h-64 w-64 -mr-16 -mt-16 animate-pulse" style={{ animationDuration: '3s' }} />
                 </div>
