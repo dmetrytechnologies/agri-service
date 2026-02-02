@@ -11,14 +11,16 @@
 }
 
 :root {
-    /* Default Light Mode Variables - Premium 'Cloudy Knoxville' Aesthetic */
-    --background-gradient: linear-gradient(135deg, #e0f2f1 0%, #e3f2fd 50%, #f3e5f5 100%);
+    /* Default Light Mode Variables - Lively Agri Aesthetic */
+    /* Vibrant Gradient: Soft Sage -> Warm Sunlight -> Fresh Sky */
+    --background-gradient: linear-gradient(135deg, #dcfce7 0%, #fef3c7 50%, #e0f2fe 100%);
+
     --foreground: #1e293b;
     /* Slate 800/Blue-Grey - Premium & Easy on eyes */
 
-    /* Satin Glass - Good compromise on visibility & style */
-    --glass-bg: rgba(255, 255, 255, 0.5);
-    --glass-border: rgba(255, 255, 255, 0.5);
+    /* Satin Glass - More transparent to show the colorful background */
+    --glass-bg: rgba(255, 255, 255, 0.4);
+    --glass-border: rgba(255, 255, 255, 0.6);
     --glass-blur: 20px;
     /* Strong blur */
     --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);

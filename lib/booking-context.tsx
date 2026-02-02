@@ -57,15 +57,15 @@ export function BookingProvider({ children }: { children: ReactNode }) {
     const fetchBookings = async () => {
         try {
             // Connectivity Check
-            try {
-                const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-                if (url) {
-                    const res = await fetch(url, { method: 'HEAD', mode: 'no-cors' });
-                    console.log('Supabase connectivity check:', res.type);
-                }
-            } catch (e) {
-                console.warn('Supabase URL is unreachable:', e);
-            }
+            // try {
+            //     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+            //     if (url) {
+            //         const res = await fetch(url, { method: 'HEAD', mode: 'no-cors' });
+            //         // console.log('Supabase connectivity check:', res.type);
+            //     }
+            // } catch (e) {
+            //     console.warn('Supabase URL is unreachable:', e);
+            // }
 
             const { data: jobsData, error: jobsError } = await supabase
                 .from('jobs')

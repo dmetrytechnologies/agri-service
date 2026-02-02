@@ -35,24 +35,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Check active session
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
 
-      if (session?.user) {
-        // Authenticated, now fetch profile
-        const profile = await fetchProfile(session.user.id, session.user.phone!);
-        if (profile) {
-          setUser(profile);
+        if (session?.user) {
+          // Authenticated, now fetch profile
+          const profile = await fetchProfile(session.user.id, session.user.phone!);
+          if (profile) {
+            setUser(profile);
+          }
         } else {
-          // Logged in but no profile found (this shouldn't happen unless data mismatch)
-          // Could redirect to onboarding
+          localStorage.removeItem('agri_user');
         }
-      } else {
-        // Fallback to local storage for "remember me" behavior if auth session is gone?
-        // Ideally we stick to Supabase session.
-        // For migration: Check if we have the old local storage and clear it to forceful migration
-        localStorage.removeItem('agri_user');
+      } catch (error) {
+        console.error('Session check error:', error);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
     checkSession();
@@ -70,21 +69,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const fetchProfile = async (authId: string, phone: string): Promise<User | null> => {
-    // Search in all tables by phone (since we might not have linked authId yet)
-    // Ideally we search by auth_id, but during migration we match by phone
+    // Search in all tables by phone simultaneously using Promise.all
+    try {
+      const [adminRes, opRes, farmerRes] = await Promise.all([
+        supabase.from('admins').select('*').eq('phone', phone).single(),
+        supabase.from('operators').select('*').eq('phone', phone).single(),
+        supabase.from('farmers').select('*').eq('phone', phone).single()
+      ]);
 
-    // 1. Admin
-    const { data: admin } = await supabase.from('admins').select('*').eq('phone', phone).single();
-    if (admin) return { id: authId, name: admin.name, role: 'admin', phone };
-
-    // 2. Operator
-    const { data: op } = await supabase.from('operators').select('*').eq('phone', phone).single();
-    if (op) return { id: authId, name: op.name, role: 'operator', phone: op.phone, address: op.location };
-
-    // 3. Farmer
-    const { data: farmer } = await supabase.from('farmers').select('*').eq('phone', phone).single();
-    if (farmer) return { id: authId, name: farmer.name, role: 'farmer', phone: farmer.phone, address: farmer.address, pincode: farmer.pincode };
-
+      if (adminRes.data) return { id: authId, name: adminRes.data.name, role: 'admin', phone };
+      if (opRes.data) return { id: authId, name: opRes.data.name, role: 'operator', phone: opRes.data.phone, address: opRes.data.location };
+      if (farmerRes.data) return { id: authId, name: farmerRes.data.name, role: 'farmer', phone: farmerRes.data.phone, address: farmerRes.data.address, pincode: farmerRes.data.pincode };
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+    }
     return null;
   };
 
@@ -113,23 +111,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (data.session?.user) {
         const userId = data.session.user.id;
 
-        // Handle "Remember Me" (Session vs Persistent Cookie)
-        if (!rememberMe) {
-          // Supabase defaults to persistent cookies. We manually convert them to session cookies
-          // by re-setting them without Max-Age/Expires.
-          // Note: This matches the default project prefix 'sb-' or typical supabase pattern.
-          if (typeof document !== 'undefined') {
-            const cookies = document.cookie.split(';');
-            cookies.forEach(cookie => {
-              const trimmed = cookie.trim();
-              if (trimmed.startsWith('sb-') && trimmed.includes('-auth-token')) {
-                const [name, value] = trimmed.split('=');
-                // Re-set as session cookie (path=/ is critical)
-                document.cookie = `${name}=${value}; path=/; samesite=lax`;
-              }
-            });
-          }
-        }
+        // REMOVED: Manual cookie manipulation which was causing infinite loops/white screens.
+        // We rely on Supabase's default session handling.
 
         // Check for pending signup data
         const pendingDataStr = localStorage.getItem('temp_signup_data');
