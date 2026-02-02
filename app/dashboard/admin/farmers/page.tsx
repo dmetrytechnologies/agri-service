@@ -109,12 +109,25 @@ export default function AdminFarmersPage() {
         if (!confirm(`Are you sure you want to delete ${name}? This cannot be undone.`)) return;
 
         try {
+            // 1. Delete associated jobs (bookings) first
+            const { error: jobsError } = await supabase.from('jobs').delete().eq('farmer_phone', phone);
+            if (jobsError) {
+                console.error("Error deleting farmer jobs:", jobsError);
+                // Continue to try deleting farmer even if jobs fail? 
+                // Better to throw effectively, but we want to be robust. 
+                // If permission denied on jobs, farmer delete might still work but they will reappear.
+                // Let's assume the improved policy handles both.
+                throw new Error("Failed to clean up farmer bookings.");
+            }
+
+            // 2. Delete the farmer record
             const { error } = await supabase.from('farmers').delete().eq('phone', phone);
             if (error) throw error;
+
             await refreshData(); // Refresh list
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error deleting farmer:", error);
-            alert("Failed to delete farmer.");
+            alert(`Failed to delete farmer: ${error.message || 'Unknown error'}`);
         }
     };
 
