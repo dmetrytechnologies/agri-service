@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth, UserRole } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
-import { Smartphone, ArrowRight, UserPlus, LogIn, User, MapPin } from 'lucide-react';
+import { Smartphone, ArrowRight, UserPlus, LogIn, User, MapPin, Loader2 } from 'lucide-react';
 import ServiceAreaSelector from '@/components/ServiceAreaSelector';
 
 const TypingEffect = ({ text }: { text: string }) => {
@@ -35,6 +35,7 @@ export default function LoginPage() {
   const router = useRouter();
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form States
   const [phone, setPhone] = useState('');
@@ -68,12 +69,14 @@ export default function LoginPage() {
       return;
     }
 
+    setIsSubmitting(true);
     try {
       // Strict Registry Check before OTP for LOGIN mode
       if (mode === 'login') {
         const exists = await checkUserExists(phone);
         if (!exists) {
           setError('User not found. Please create an account.');
+          setIsSubmitting(false);
           return;
         }
       }
@@ -86,6 +89,8 @@ export default function LoginPage() {
       startTimer();
     } catch (err: any) {
       setError(err.message || 'Failed to send OTP. Try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -110,6 +115,7 @@ export default function LoginPage() {
       return;
     }
 
+    setIsSubmitting(true);
     try {
       // Correctly call verifyOtp for both Login and Signup flows
       // verifyOtp in auth-context will handle profile creation if it was a signup
@@ -120,6 +126,7 @@ export default function LoginPage() {
     } catch (err: any) {
       setError(err.message || 'Verification failed. please try again.');
       // Don't reset step to phone, let them retry OTP
+      setIsSubmitting(false);
     }
   };
 
@@ -288,9 +295,16 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              className="glass-button glass-button-primary w-full py-4 text-lg"
+              disabled={isSubmitting}
+              className="glass-button glass-button-primary w-full py-4 text-lg disabled:opacity-70 disabled:cursor-wait"
             >
-              {mode === 'login' ? 'Secure Login' : 'Finalize Registration'}
+              {isSubmitting ? (
+                <span className="flex items-center justify-center gap-2">
+                  <Loader2 className="h-5 w-5 animate-spin" /> Verifying...
+                </span>
+              ) : (
+                mode === 'login' ? 'Secure Login' : 'Finalize Registration'
+              )}
             </button>
           </form>
         ) : mode === 'login' ? (
@@ -329,9 +343,16 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              className="glass-button glass-button-primary w-full py-4 text-lg mt-4"
+              disabled={isSubmitting}
+              className="glass-button glass-button-primary w-full py-4 text-lg mt-4 disabled:opacity-70 disabled:cursor-wait"
             >
-              Continue <ArrowRight className="h-5 w-5 ml-2" />
+              {isSubmitting ? (
+                <span className="flex items-center justify-center gap-2">
+                  <Loader2 className="h-5 w-5 animate-spin" /> Checking...
+                </span>
+              ) : (
+                <>Continue <ArrowRight className="h-5 w-5 ml-2" /></>
+              )}
             </button>
 
 
@@ -496,9 +517,16 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              className="glass-button glass-button-primary w-full py-4 text-lg mt-4"
+              disabled={isSubmitting}
+              className="glass-button glass-button-primary w-full py-4 text-lg mt-4 disabled:opacity-70 disabled:cursor-wait"
             >
-              Request OTP <ArrowRight className="h-5 w-5 ml-2" />
+              {isSubmitting ? (
+                <span className="flex items-center justify-center gap-2">
+                  <Loader2 className="h-5 w-5 animate-spin" /> Processing...
+                </span>
+              ) : (
+                <>Request OTP <ArrowRight className="h-5 w-5 ml-2" /></>
+              )}
             </button>
           </form>
         )}

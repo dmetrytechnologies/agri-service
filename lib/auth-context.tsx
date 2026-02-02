@@ -227,12 +227,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const checkUserExists = async (phone: string) => {
     try {
-      const { data: admin } = await supabase.from('admins').select('id').eq('phone', phone).single();
-      if (admin) return true;
-      const { data: op } = await supabase.from('operators').select('id').eq('phone', phone).single();
-      if (op) return true;
-      const { data: farmer } = await supabase.from('farmers').select('id').eq('phone', phone).single();
-      if (farmer) return true;
+      const [adminRes, opRes, farmerRes] = await Promise.all([
+        supabase.from('admins').select('id').eq('phone', phone).single(),
+        supabase.from('operators').select('id').eq('phone', phone).single(),
+        supabase.from('farmers').select('id').eq('phone', phone).single()
+      ]);
+
+      if (adminRes.data || opRes.data || farmerRes.data) return true;
       return false;
     } catch (error) {
       return false;
