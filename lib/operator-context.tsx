@@ -18,10 +18,10 @@ export interface Operator {
 
 interface OperatorContextType {
     operators: Operator[];
-    addOperator: (operator: Omit<Operator, 'id' | 'status' | 'jobsCompleted'>) => void;
+    addOperator: (operator: Omit<Operator, 'id' | 'status' | 'jobsCompleted'>) => Promise<boolean>;
     updateOperatorStatus: (id: string, status: Operator['status']) => void;
     deleteOperator: (id: string) => void;
-    editOperator: (id: string, data: Partial<Omit<Operator, 'id' | 'jobsCompleted' | 'status'>>) => void;
+    editOperator: (id: string, data: Partial<Omit<Operator, 'id' | 'jobsCompleted' | 'status'>>) => Promise<boolean>;
     isLoading: boolean;
 }
 
@@ -64,7 +64,7 @@ export function OperatorProvider({ children }: { children: ReactNode }) {
         };
     }, []);
 
-    const addOperator = async (data: Omit<Operator, 'id' | 'status' | 'jobsCompleted'>) => {
+    const addOperator = async (data: Omit<Operator, 'id' | 'status' | 'jobsCompleted'>): Promise<boolean> => {
         try {
             const { error } = await supabase
                 .from('operators')
@@ -83,9 +83,11 @@ export function OperatorProvider({ children }: { children: ReactNode }) {
             if (error) throw error;
             // fetchOperators() is called automatically via subscription, or we can call it manually to be safe
             fetchOperators();
+            return true;
         } catch (error: any) {
             console.error('Error adding operator:', error.message || error);
             alert('Failed to add operator. Please try again.');
+            return false;
         }
     };
 
@@ -118,7 +120,7 @@ export function OperatorProvider({ children }: { children: ReactNode }) {
         }
     };
 
-    const editOperator = async (id: string, data: Partial<Omit<Operator, 'id' | 'jobsCompleted' | 'status'>>) => {
+    const editOperator = async (id: string, data: Partial<Omit<Operator, 'id' | 'jobsCompleted' | 'status'>>): Promise<boolean> => {
         try {
             const { error } = await supabase
                 .from('operators')
@@ -135,9 +137,11 @@ export function OperatorProvider({ children }: { children: ReactNode }) {
 
             if (error) throw error;
             fetchOperators();
+            return true;
         } catch (error) {
             console.error('Error editing operator:', error);
             alert('Failed to update operator details.');
+            return false;
         }
     };
 

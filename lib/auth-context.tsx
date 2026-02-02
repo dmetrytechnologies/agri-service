@@ -72,9 +72,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Search in all tables by phone simultaneously using Promise.all
     try {
       const [adminRes, opRes, farmerRes] = await Promise.all([
-        supabase.from('admins').select('*').eq('phone', phone).single(),
-        supabase.from('operators').select('*').eq('phone', phone).single(),
-        supabase.from('farmers').select('*').eq('phone', phone).single()
+        supabase.from('admins').select('*').eq('phone', phone).maybeSingle(),
+        supabase.from('operators').select('*').eq('phone', phone).maybeSingle(),
+        supabase.from('farmers').select('*').eq('phone', phone).maybeSingle()
       ]);
 
       if (adminRes.data) return { id: authId, name: adminRes.data.name, role: 'admin', phone };
@@ -211,9 +211,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const checkUserExists = async (phone: string) => {
     try {
       const [adminRes, opRes, farmerRes] = await Promise.all([
-        supabase.from('admins').select('id').eq('phone', phone).single(),
-        supabase.from('operators').select('id').eq('phone', phone).single(),
-        supabase.from('farmers').select('id').eq('phone', phone).single()
+        supabase.from('admins').select('id').eq('phone', phone).maybeSingle(),
+        supabase.from('operators').select('id').eq('phone', phone).maybeSingle(),
+        supabase.from('farmers').select('id').eq('phone', phone).maybeSingle()
       ]);
 
       if (adminRes.data || opRes.data || farmerRes.data) return true;

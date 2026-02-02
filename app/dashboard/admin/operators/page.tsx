@@ -64,11 +64,12 @@ export default function OperatorsPage() {
         }
     };
 
-    const handleAddOperator = (e: React.FormEvent) => {
+    const handleAddOperator = async (e: React.FormEvent) => {
         e.preventDefault();
 
+        let success = false;
         if (editingId) {
-            editOperator(editingId, {
+            success = await editOperator(editingId, {
                 name: newOp.name,
                 phone: newOp.phone,
                 location: newOp.location,
@@ -78,7 +79,7 @@ export default function OperatorsPage() {
                 available_dates: [new Date().toISOString().split('T')[0]]
             });
         } else {
-            addOperator({
+            success = await addOperator({
                 name: newOp.name,
                 phone: newOp.phone,
                 location: newOp.location,
@@ -88,9 +89,12 @@ export default function OperatorsPage() {
                 available_dates: [new Date().toISOString().split('T')[0]]
             });
         }
-        setIsModalOpen(false);
-        setEditingId(null);
-        setNewOp({ name: '', phone: '', location: '', district: '', service_pincodes: [], service_villages: [] });
+
+        if (success) {
+            setIsModalOpen(false);
+            setEditingId(null);
+            setNewOp({ name: '', phone: '', location: '', district: '', service_pincodes: [], service_villages: [] });
+        }
     };
 
     const openEditModal = (op: any) => {
