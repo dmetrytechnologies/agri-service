@@ -224,10 +224,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
     setUser(null);
     localStorage.removeItem('agri_user');
-    router.push('/');
+    window.location.href = '/'; // Force a hard refresh to clear all application state
   };
 
   return (
