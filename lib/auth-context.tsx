@@ -96,14 +96,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchProfile = async (authId: string, phone: string): Promise<User | null> => {
     // Search in all tables by phone simultaneously using Promise.all
+    // Normalize phone: remove +91 or other prefixes, take last 10 digits
+    const cleanPhone = phone.slice(-10);
+    console.log('Fetching profile for:', cleanPhone);
+
     try {
       const [adminRes, opRes, farmerRes] = await Promise.all([
-        supabase.from('admins').select('*').eq('phone', phone).maybeSingle(),
-        supabase.from('operators').select('*').eq('phone', phone).maybeSingle(),
-        supabase.from('farmers').select('*').eq('phone', phone).maybeSingle()
+        supabase.from('admins').select('*').eq('phone', cleanPhone).maybeSingle(),
+        supabase.from('operators').select('*').eq('phone', cleanPhone).maybeSingle(),
+        supabase.from('farmers').select('*').eq('phone', cleanPhone).maybeSingle()
       ]);
 
-      if (adminRes.data) return { id: authId, name: adminRes.data.name, role: 'admin', phone };
+      if (adminRes.data) return { id: authId, name: adminRes.data.name, role: 'admin', phone: cleanPhone };
       if (opRes.data) return { id: authId, name: opRes.data.name, role: 'operator', phone: opRes.data.phone, address: opRes.data.location };
       if (farmerRes.data) return { id: authId, name: farmerRes.data.name, role: 'farmer', phone: farmerRes.data.phone, address: farmerRes.data.address, pincode: farmerRes.data.pincode };
     } catch (error) {
@@ -136,6 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) throw error;
       if (data.session?.user) {
         const userId = data.session.user.id;
+        const sessionPhone = data.session.user.phone || phone; // Use authenticated phone from session if available
 
         // REMOVED: Manual cookie manipulation which was causing infinite loops/white screens.
         // We rely on Supabase's default session handling.
@@ -145,16 +150,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (pendingDataStr) {
           const pendingData = JSON.parse(pendingDataStr);
           // Basic check to ensure we are creating profile for the correct phone
-          if (pendingData.phone === phone) {
+          // Compare last 10 digits to be safe
+          if (pendingData.phone.slice(-10) === sessionPhone.slice(-10)) {
             await createProfile(userId, pendingData);
           }
           localStorage.removeItem('temp_signup_data');
         }
 
         // Load Profile
-        const profile = await fetchProfile(userId, phone);
-        setUser(profile);
-        return true;
+        const profile = await fetchProfile(userId, sessionPhone);
+        if (profile) {
+          setUser(profile);
+          return true;
+        } else {
+          console.warn("User authenticated but no profile found in DB.");
+          return false; // Or handle as "Profile not found" error
+        }
       }
       return false;
     } catch (error: any) {
