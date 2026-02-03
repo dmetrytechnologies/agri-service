@@ -132,14 +132,17 @@ export default function LoginPage() {
 
 
   const handleSignUpInit = async (e: React.FormEvent) => {
-    e.preventDefault();
+    console.log('SignUp Init:', { name, phone, role, servicePincodesLength: servicePincodes.length });
+
     if (!name || phone.length < 10) {
+      console.warn('Validation Failed: Name or Phone');
       setError('Please fill name and phone correctly');
       return;
     }
 
     setIsSubmitting(true);
     try {
+      console.log('Checking user existence...');
       // Check if user already exists
       const exists = await checkUserExists(phone);
       if (exists) {
@@ -165,6 +168,8 @@ export default function LoginPage() {
       startTimer();
 
     } catch (err: any) {
+      console.error('SignUp Error:', err);
+      // alert(err.message); // Temporary debug
       setError(err.message || 'Registration failed.');
     } finally {
       setIsSubmitting(false);
