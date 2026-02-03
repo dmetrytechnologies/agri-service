@@ -303,24 +303,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return false;
     }
   };
-};
 
-const logout = async () => {
-  try {
-    await supabase.auth.signOut();
-  } catch (error) {
-    console.error('Logout error:', error);
-  }
-  setUser(null);
-  localStorage.removeItem('agri_user');
-  router.push('/?logout=success');
-};
+  const logout = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+    setUser(null);
+    localStorage.removeItem('agri_user');
+    router.push('/?logout=success');
+  };
 
-return (
-  <AuthContext.Provider value={{ user, login, verifyOtp, signUp, logout, checkUserExists, isLoading }}>
-    {children}
-  </AuthContext.Provider>
-);
+  return (
+    <AuthContext.Provider value={{ user, login, verifyOtp, signUp, logout, checkUserExists, isLoading }}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth() {
