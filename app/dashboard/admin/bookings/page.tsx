@@ -136,9 +136,16 @@ export default function AllBookingsPage() {
         try {
             const res = await fetch(`/api/admin/jobs/${booking.id}/matches`);
             const data = await res.json();
+
+            if (!res.ok) {
+                throw new Error(data.error || 'Failed to fetch matches');
+            }
+
             setMatchingResults(data);
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error fetching matches:', error);
+            alert(`Matching Engine Error: ${error.message}`);
+            setIsAssignModalOpen(false); // Close matching modal on error
         } finally {
             setIsMatchingLoading(false);
         }
