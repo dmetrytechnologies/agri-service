@@ -138,11 +138,13 @@ export default function LoginPage() {
       return;
     }
 
+    setIsSubmitting(true);
     try {
       // Check if user already exists
       const exists = await checkUserExists(phone);
       if (exists) {
         setError('Account already registered. Please Sign In.');
+        // setIsSubmitting(false); // Handled in finally
         return;
       }
 
@@ -163,8 +165,9 @@ export default function LoginPage() {
       startTimer();
 
     } catch (err: any) {
-      setError(err.message ||
-        'Registration failed.');
+      setError(err.message || 'Registration failed.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 

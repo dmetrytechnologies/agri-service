@@ -1,96 +1,26 @@
--- Drop inefficient policies first
--- Farmers
-DROP POLICY IF EXISTS "Enable insert for admins" ON "public"."farmers";
-DROP POLICY IF EXISTS "Enable update for admins" ON "public"."farmers";
+-- ==============================================================================
+-- CLEANUP: REMOVE REDUNDANT POLICIES
+-- DATE: 2026-02-03
+-- DESCRIPTION: Drops "Enable ... for admins" policies because the new unified 
+--              policies (e.g., "Insert Farmers") already include checks for:
+--              "public.is_admin() OR ..."
+--              Removing these duplicates fixes the "Multiple Permissive Policies" warning.
+-- ==============================================================================
 
--- Operators
-DROP POLICY IF EXISTS "Enable insert for admins" ON "public"."operators";
-DROP POLICY IF EXISTS "Enable update for admins" ON "public"."operators";
+-- 1. FARMERS
+DROP POLICY IF EXISTS "Enable insert for admins" ON public.farmers;
+DROP POLICY IF EXISTS "Enable update for admins" ON public.farmers;
+DROP POLICY IF EXISTS "Enable delete for admins" ON public.farmers;
 
--- Jobs
-DROP POLICY IF EXISTS "Enable insert for admins" ON "public"."jobs";
-DROP POLICY IF EXISTS "Enable update for admins" ON "public"."jobs";
+-- 2. OPERATORS
+DROP POLICY IF EXISTS "Enable insert for admins" ON public.operators;
+DROP POLICY IF EXISTS "Enable update for admins" ON public.operators;
+DROP POLICY IF EXISTS "Enable delete for admins" ON public.operators;
 
--- Re-create with Optimizations
--- Use (select auth.jwt()) pattern to ensure it runs as an InitPlan (once per query) instead of per-row.
+-- 3. JOBS
+DROP POLICY IF EXISTS "Enable insert for admins" ON public.jobs;
+DROP POLICY IF EXISTS "Enable update for admins" ON public.jobs;
+DROP POLICY IF EXISTS "Enable delete for admins" ON public.jobs;
 
--- FARMERS
-CREATE POLICY "Enable insert for admins" ON "public"."farmers"
-AS PERMISSIVE FOR INSERT
-TO authenticated
-WITH CHECK (
-  EXISTS (
-    SELECT 1 FROM admins 
-    WHERE right(admins.phone, 10) = right(((select auth.jwt()) ->> 'phone'), 10)
-  )
-);
-
-CREATE POLICY "Enable update for admins" ON "public"."farmers"
-AS PERMISSIVE FOR UPDATE
-TO authenticated
-USING (
-  EXISTS (
-    SELECT 1 FROM admins 
-    WHERE right(admins.phone, 10) = right(((select auth.jwt()) ->> 'phone'), 10)
-  )
-)
-WITH CHECK (
-  EXISTS (
-    SELECT 1 FROM admins 
-    WHERE right(admins.phone, 10) = right(((select auth.jwt()) ->> 'phone'), 10)
-  )
-);
-
--- OPERATORS
-CREATE POLICY "Enable insert for admins" ON "public"."operators"
-AS PERMISSIVE FOR INSERT
-TO authenticated
-WITH CHECK (
-  EXISTS (
-    SELECT 1 FROM admins 
-    WHERE right(admins.phone, 10) = right(((select auth.jwt()) ->> 'phone'), 10)
-  )
-);
-
-CREATE POLICY "Enable update for admins" ON "public"."operators"
-AS PERMISSIVE FOR UPDATE
-TO authenticated
-USING (
-  EXISTS (
-    SELECT 1 FROM admins 
-    WHERE right(admins.phone, 10) = right(((select auth.jwt()) ->> 'phone'), 10)
-  )
-)
-WITH CHECK (
-  EXISTS (
-    SELECT 1 FROM admins 
-    WHERE right(admins.phone, 10) = right(((select auth.jwt()) ->> 'phone'), 10)
-  )
-);
-
--- JOBS
-CREATE POLICY "Enable insert for admins" ON "public"."jobs"
-AS PERMISSIVE FOR INSERT
-TO authenticated
-WITH CHECK (
-  EXISTS (
-    SELECT 1 FROM admins 
-    WHERE right(admins.phone, 10) = right(((select auth.jwt()) ->> 'phone'), 10)
-  )
-);
-
-CREATE POLICY "Enable update for admins" ON "public"."jobs"
-AS PERMISSIVE FOR UPDATE
-TO authenticated
-USING (
-  EXISTS (
-    SELECT 1 FROM admins 
-    WHERE right(admins.phone, 10) = right(((select auth.jwt()) ->> 'phone'), 10)
-  )
-)
-WITH CHECK (
-  EXISTS (
-    SELECT 1 FROM admins 
-    WHERE right(admins.phone, 10) = right(((select auth.jwt()) ->> 'phone'), 10)
-  )
-);
+-- Force schema reload to apply changes immediately
+NOTIFY pgrst, 'reload config';

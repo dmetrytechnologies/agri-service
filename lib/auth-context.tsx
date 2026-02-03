@@ -162,13 +162,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         // Load Profile
+        // Load Profile
         const profile = await fetchProfile(userId, sessionPhone);
         if (profile) {
           setUser(profile);
           return true;
         } else {
           console.warn("User authenticated but no profile found in DB.");
-          return false; // Or handle as "Profile not found" error
+          // Improve Feedback: If we just signed up, this means CreateProfile failed or RLS blocked reading it.
+          throw new Error("Authentication successful, but profile creation failed. Please try again or contact support.");
         }
       }
       return false;
