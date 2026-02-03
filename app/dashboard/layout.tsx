@@ -55,12 +55,12 @@ export default function DashboardLayout({
             <BookingProvider>
                 <div className="min-h-screen bg-transparent flex flex-col md:flex-row">
                     {/* Mobile Header */}
-                    <div className="md:hidden bg-white/80 dark:bg-black/50 backdrop-blur-md border-b border-white/20 p-4 flex justify-between items-center sticky top-0 z-20">
-                        <div className="flex items-center gap-2 font-bold text-[var(--primary)]">
+                    <div className="md:hidden bg-white/80 dark:bg-black/95 backdrop-blur-md border-b border-gray-200 dark:border-white/10 p-4 flex justify-between items-center sticky top-0 z-20 text-gray-900 dark:text-white">
+                        <div className="flex items-center gap-2 font-bold text-green-600 dark:text-[#52b788]">
                             <Leaf className="h-6 w-6" />
                             <span>Agri Drone</span>
                         </div>
-                        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="text-[var(--foreground)]">
+                        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="text-gray-900 dark:text-white">
                             {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
                         </button>
                     </div>
