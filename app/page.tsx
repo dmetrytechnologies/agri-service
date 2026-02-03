@@ -275,6 +275,7 @@ function LoginContent() {
                 type="text"
                 required
                 autoFocus
+                autoComplete="one-time-code"
                 className="glass-input text-center text-4xl font-black tracking-[0.5em] h-20 placeholder:text-gray-400/50"
                 placeholder=""
                 value={otp}
@@ -349,6 +350,7 @@ function LoginContent() {
                   name="phone"
                   type="text"
                   required
+                  autoComplete="tel"
                   className="glass-input pl-14 h-14 font-bold"
                   placeholder=""
                   value={phone}
@@ -412,6 +414,7 @@ function LoginContent() {
                   id="name"
                   type="text"
                   required
+                  autoComplete="name"
                   className="glass-input pl-14 h-14 font-bold"
                   placeholder=""
                   value={name}
@@ -430,6 +433,7 @@ function LoginContent() {
                   id="phone-signup"
                   type="text"
                   required
+                  autoComplete="tel"
                   className="glass-input pl-14 h-14 font-bold"
                   placeholder=""
                   value={phone}
@@ -451,6 +455,7 @@ function LoginContent() {
                         id="address"
                         type="text"
                         required
+                        autoComplete="street-address"
                         className="glass-input pl-12 h-14 font-bold"
                         placeholder="H.No / Street"
                         value={address}
@@ -468,6 +473,7 @@ function LoginContent() {
                         id="pincode"
                         type="text"
                         required
+                        autoComplete="postal-code"
                         className="glass-input pl-12 h-14 font-bold"
                         placeholder="6 Digit PIN"
                         value={pincode}
