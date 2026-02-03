@@ -108,24 +108,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const fetchProfile = async (authId: string, phone: string): Promise<User | null> => {
-    // Search in all tables by phone simultaneously using Promise.all
-    // Normalize phone: remove +91 or other prefixes, take last 10 digits
     if (!phone) return null;
     const cleanPhone = phone.slice(-10);
     console.log('Fetching profile for:', cleanPhone);
 
     try {
-      const [adminRes, opRes, farmerRes] = await Promise.all([
-        supabase.from('admins').select('*').eq('phone', cleanPhone).maybeSingle(),
-        supabase.from('operators').select('*').eq('phone', cleanPhone).maybeSingle(),
-        supabase.from('farmers').select('*').eq('phone', cleanPhone).maybeSingle()
-      ]);
+      // Optimized: Use server-side RPC to check all tables in one go
+      const { data, error } = await supabase.rpc('get_user_profile', { phone_input: cleanPhone });
 
-      if (adminRes.data) return { id: authId, name: adminRes.data.name, role: 'admin', phone: cleanPhone };
-      if (opRes.data) return { id: authId, name: opRes.data.name, role: 'operator', phone: opRes.data.phone, address: opRes.data.location };
-      if (farmerRes.data) return { id: authId, name: farmerRes.data.name, role: 'farmer', phone: farmerRes.data.phone, address: farmerRes.data.address, pincode: farmerRes.data.pincode };
+      if (error) {
+        console.error('Error fetching profile (RPC):', error);
+        return null;
+      }
+
+      if (data) {
+        // Map RPC result to User interface
+        // Note: RPC returns snake_case keys usually if returning jsonb built that way.
+        // My RPC uses json_build_object with specific keys.
+        return {
+          id: authId,
+          name: data.name,
+          role: data.role as UserRole,
+          phone: data.phone,
+          address: data.address,
+          pincode: data.pincode
+        };
+      }
     } catch (error) {
-      console.error('Error fetching profile:', error);
+      console.error('Exception fetching profile:', error);
     }
     return null;
   };
@@ -274,32 +284,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       if (!phone) return false;
       const cleanPhone = phone.replace(/\D/g, '').slice(-10);
-
       console.log('Checking existence for:', cleanPhone);
 
-      // Timeout wrapper to prevent hanging
-      const dbCheck = Promise.all([
-        supabase.from('admins').select('id').eq('phone', cleanPhone).maybeSingle(),
-        supabase.from('operators').select('id').eq('phone', cleanPhone).maybeSingle(),
-        supabase.from('farmers').select('id').eq('phone', cleanPhone).maybeSingle()
-      ]);
+      // Use the same RPC. If it returns data, user exists.
+      const { data, error } = await supabase.rpc('get_user_profile', { phone_input: cleanPhone });
 
-      const timeout = new Promise<any>((_, reject) =>
-        setTimeout(() => reject(new Error('Request timed out')), 8000)
-      );
-
-      const [adminRes, opRes, farmerRes] = await Promise.race([dbCheck, timeout]) as any[];
-
-      if (adminRes?.error) console.error('Admin check error:', adminRes.error);
-      if (opRes?.error) console.error('Operator check error:', opRes.error);
-      if (farmerRes?.error) console.error('Farmer check error:', farmerRes.error);
-
-      if (adminRes?.data || opRes?.data || farmerRes?.data) return true;
-      return false;
+      if (error) {
+        console.error('checkUserExists error:', error);
+        return false;
+      }
+      return !!data;
     } catch (error) {
       console.error('checkUserExists failed:', error);
-      // If it's a timeout or network error, we might default to FALSE to allow them to TRY signing up,
-      // or return FALSE so they get "User not found" (which is better than hanging).
       return false;
     }
   };
