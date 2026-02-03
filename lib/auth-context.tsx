@@ -49,16 +49,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Fast path: Check local session immediately
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user && mounted) {
-          const profile = await fetchProfile(session.user.id, session.user.phone!);
+          const profile = await fetchProfile(session.user.id, session.user.phone || '');
           if (mounted) {
-            setUser(profile);
-            // If successful, we can unblock UI immediately
-            clearTimeout(safetyTimer);
-            setIsLoading(false);
+            if (profile) {
+              setUser(profile);
+              clearTimeout(safetyTimer);
+              setIsLoading(false);
+            } else {
+              // Zombie session detected (Session exists but no Profile found)
+              // This matches the "clearing cookie" fix. We force clear it here.
+              console.warn("Session found but no profile. Forcing partial logout to reset state.");
+              await supabase.auth.signOut();
+              setUser(null);
+            }
           }
         }
       } catch (e) {
         console.error("Initial session check failed", e);
+        // Ensure we don't leave user in loading state
+        if (mounted) setIsLoading(false);
       }
     };
 
@@ -69,8 +78,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log('Auth state change:', event);
 
       if (session?.user) {
-        const profile = await fetchProfile(session.user.id, session.user.phone!);
-        if (mounted) setUser(profile);
+        const profile = await fetchProfile(session.user.id, session.user.phone || '');
+        if (mounted) {
+          if (profile) setUser(profile);
+          else {
+            // If we have a session but no profile, it might be a new signup OR a zombie session.
+            // If it's a SIGNED_IN event (login), but no profile, we verifyCtx will handle creation.
+            // But if it is INITIAL_SESSION, we should probably clear it?
+            // For safety, let's just set User to null.
+            setUser(null);
+          }
+        }
       } else {
         if (mounted) setUser(null);
       }
@@ -92,6 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchProfile = async (authId: string, phone: string): Promise<User | null> => {
     // Search in all tables by phone simultaneously using Promise.all
     // Normalize phone: remove +91 or other prefixes, take last 10 digits
+    if (!phone) return null;
     const cleanPhone = phone.slice(-10);
     console.log('Fetching profile for:', cleanPhone);
 
@@ -274,7 +293,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setUser(null);
     localStorage.removeItem('agri_user');
-    router.push('/');
+    router.push('/?logout=success');
   };
 
   return (

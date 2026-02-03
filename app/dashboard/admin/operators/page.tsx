@@ -32,6 +32,7 @@ export default function OperatorsPage() {
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedJob, setSelectedJob] = useState<any>(null);
+    const [selectedOperator, setSelectedOperator] = useState<any>(null);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [newOp, setNewOp] = useState<{
         name: string;
@@ -146,7 +147,10 @@ export default function OperatorsPage() {
                     const assignedJobs = bookings.filter(b => b.operator === op.name);
 
                     return (
-                        <div key={op.id} className="glass-card hover:bg-white/10 transition-all flex flex-col h-full group border-l-4" style={{ borderLeftColor: op.status === 'In-Field' ? '#3b82f6' : op.status === 'Idle' ? '#22c55e' : '#9ca3af' }}>
+                        <div key={op.id}
+                            onClick={() => setSelectedOperator(op)}
+                            className="glass-card hover:bg-white/10 transition-all flex flex-col h-full group border-l-4 cursor-pointer"
+                            style={{ borderLeftColor: op.status === 'In-Field' ? '#3b82f6' : op.status === 'Idle' ? '#22c55e' : '#9ca3af' }}>
                             <div className="flex justify-between items-start mb-4">
                                 <div className="h-12 w-12 rounded-xl bg-[var(--primary)]/10 flex items-center justify-center text-[var(--primary)] font-black text-xl border border-[var(--primary)]/20 shadow-inner">
                                     {op.name.charAt(0)}
@@ -157,6 +161,7 @@ export default function OperatorsPage() {
                             </div>
 
                             <h3 className="font-black text-[var(--foreground)] text-lg mb-0.5">{op.name}</h3>
+                            <p className="text-[10px] font-black text-[var(--primary)] uppercase tracking-widest mb-2">{op.displayId || 'DRO---'}</p>
                             <div className="flex items-center gap-2 mb-4 group/phone">
                                 <a
                                     href={`tel:${op.phone}`}
@@ -165,7 +170,7 @@ export default function OperatorsPage() {
                                     {op.phone}
                                 </a>
                                 <button
-                                    onClick={() => handleCopyPhone(op.phone, op.id)}
+                                    onClick={(e) => { e.stopPropagation(); handleCopyPhone(op.phone, op.id); }}
                                     className={`p-1 rounded transition-all ${copiedPhoneId === op.id
                                         ? 'text-green-500 bg-green-500/10'
                                         : 'text-[var(--muted)] opacity-0 group-hover/phone:opacity-100 hover:text-[var(--primary)]'
@@ -231,7 +236,8 @@ export default function OperatorsPage() {
                                     Fleet Sync
                                 </button>
                                 <button
-                                    onClick={() => {
+                                    onClick={(e) => {
+                                        e.stopPropagation();
                                         if (confirm(`Are you sure you want to delete ${op.name}?`)) deleteOperator(op.id);
                                     }}
                                     className="p-2 text-[var(--muted)] hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors border border-transparent hover:border-red-500/20"
@@ -240,7 +246,7 @@ export default function OperatorsPage() {
                                     <Trash2 className="h-4 w-4" />
                                 </button>
                                 <button
-                                    onClick={() => openEditModal(op)}
+                                    onClick={(e) => { e.stopPropagation(); openEditModal(op); }}
                                     className="p-2 text-[var(--muted)] hover:text-[var(--primary)] hover:bg-[var(--primary)]/10 rounded-lg transition-colors border border-transparent hover:border-[var(--primary)]/20"
                                 >
                                     <Settings className="h-4 w-4" />
@@ -255,7 +261,7 @@ export default function OperatorsPage() {
             {selectedJob && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={() => setSelectedJob(null)} />
-                    <div className="relative w-full max-w-sm glass-card p-8 rounded-[2.5rem] shadow-2xl border border-white/20 animate-in zoom-in duration-300">
+                    <div className="relative w-full max-w-sm glass-card p-8 rounded-[2.5rem] shadow-2xl border border-white/20 animate-in zoom-in duration-300 max-h-[90vh] overflow-y-auto custom-scrollbar">
                         <div className="flex flex-col items-center text-center mb-6">
                             <div className="h-16 w-16 bg-[var(--primary)]/10 text-[var(--primary)] rounded-2xl flex items-center justify-center mb-4 border border-[var(--primary)]/20">
                                 <ClipboardList className="h-8 w-8" />
@@ -318,7 +324,7 @@ export default function OperatorsPage() {
             {isModalOpen && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleCloseModal} />
-                    <div className="relative w-full max-w-md glass-card p-8 rounded-3xl shadow-2xl border border-white/10 animate-in zoom-in duration-300">
+                    <div className="relative w-full max-w-md glass-card p-8 rounded-3xl shadow-2xl border border-white/10 animate-in zoom-in duration-300 max-h-[90vh] overflow-y-auto custom-scrollbar">
                         <div className="flex justify-between items-center mb-6">
                             <h2 className="text-2xl font-black text-[var(--foreground)] italic">{editingId ? 'Edit Pilot' : 'Register Pilot'}</h2>
                             <button
@@ -403,12 +409,98 @@ export default function OperatorsPage() {
                                 </button>
                                 <button
                                     type="submit"
-                                    className="flex-[2] glass-button glass-button-primary py-3 shadow-xl"
+                                    className="glass-button glass-button-primary px-8 py-3"
                                 >
-                                    {editingId ? 'Save Changes' : 'Confirm Registration'}
+                                    {editingId ? 'Update Pilot' : 'Onboard Pilot'}
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* OPERATOR DETAILS MODAL */}
+            {selectedOperator && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={() => setSelectedOperator(null)} />
+                    <div className="relative glass-card w-full max-w-sm p-8 shadow-2xl animate-in zoom-in duration-300 bg-[var(--glass-bg)] overflow-y-auto max-h-[90vh] custom-scrollbar">
+                        <div className="flex flex-col items-center text-center mb-6">
+                            <div className="h-20 w-20 bg-[var(--primary)]/10 text-[var(--primary)] rounded-full flex items-center justify-center mb-4 border border-[var(--primary)]/20 shadow-inner">
+                                <span className="text-3xl font-black">{selectedOperator.name.charAt(0)}</span>
+                            </div>
+                            <h2 className="text-2xl font-black text-[var(--foreground)] leading-tight">{selectedOperator.name}</h2>
+                            <p className="text-xs font-black text-[var(--primary)] uppercase tracking-[0.2em] mt-1">{selectedOperator.displayId || 'DRO---'}</p>
+                            <span className={`mt-2 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${getStatusColor(selectedOperator.status)}`}>
+                                {selectedOperator.status}
+                            </span>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="h-8 w-8 rounded-lg bg-[var(--primary)]/20 flex items-center justify-center text-[var(--primary)]">
+                                        <Smartphone className="h-4 w-4" />
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-black text-[var(--muted)] uppercase tracking-widest">Phone</p>
+                                        <p className="font-bold text-[var(--foreground)]">{selectedOperator.phone}</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <div className="h-8 w-8 rounded-lg bg-[var(--primary)]/20 flex items-center justify-center text-[var(--primary)]">
+                                        <MapPin className="h-4 w-4" />
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-black text-[var(--muted)] uppercase tracking-widest">Base Location</p>
+                                        <p className="font-bold text-[var(--foreground)] text-sm">{selectedOperator.location}</p>
+                                        <p className="text-xs text-[var(--muted)]">{selectedOperator.district}</p>
+                                    </div>
+                                </div>
+
+                            </div>
+
+                            {/* Service Areas */}
+                            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-2">
+                                <p className="text-[10px] font-black text-[var(--muted)] uppercase tracking-widest border-b border-white/10 pb-2 mb-2">Service Zones</p>
+                                {selectedOperator.service_pincodes?.length > 0 ? (
+                                    <div className="flex flex-wrap gap-2">
+                                        {selectedOperator.service_pincodes.map((pin: string) => (
+                                            <span key={pin} className="text-[10px] bg-white/10 px-2 py-1 rounded-md text-[var(--foreground)] font-mono">{pin}</span>
+                                        ))}
+                                    </div>
+                                ) : <p className="text-xs text-[var(--muted)] italic">No specific zones assigned</p>}
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <button
+                                    onClick={() => {
+                                        if (confirm(`Delete ${selectedOperator.name}?`)) {
+                                            deleteOperator(selectedOperator.id);
+                                            setSelectedOperator(null);
+                                        }
+                                    }}
+                                    className="flex items-center justify-center gap-2 p-3 text-red-400 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all border border-red-500/20 text-xs font-bold"
+                                >
+                                    <Trash2 className="h-4 w-4" /> Delete
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        openEditModal(selectedOperator);
+                                        setSelectedOperator(null);
+                                    }}
+                                    className="flex items-center justify-center gap-2 p-3 text-[var(--primary)] hover:bg-[var(--primary)]/10 rounded-xl transition-all border border-[var(--primary)]/20 text-xs font-bold"
+                                >
+                                    <Settings className="h-4 w-4" /> Edit Profile
+                                </button>
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={() => setSelectedOperator(null)}
+                            className="w-full glass-button glass-button-primary py-4 rounded-xl mt-6 shadow-xl"
+                        >
+                            Close Profile
+                        </button>
                     </div>
                 </div>
             )}

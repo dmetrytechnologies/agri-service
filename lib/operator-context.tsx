@@ -5,6 +5,7 @@ import { supabase } from './supabase';
 
 export interface Operator {
     id: string;
+    displayId?: string; // DRO0001
     name: string;
     phone: string;
     status: 'Idle' | 'In-Field' | 'Off-Duty';
@@ -36,7 +37,7 @@ export function OperatorProvider({ children }: { children: ReactNode }) {
         try {
             const { data, error } = await supabase
                 .from('operators')
-                .select('*')
+                .select('*, displayId:display_id')
                 .order('created_at', { ascending: false });
 
             if (error) throw error;

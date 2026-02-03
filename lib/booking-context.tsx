@@ -4,7 +4,8 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { supabase } from './supabase';
 
 export interface Booking {
-    id: string;
+    id: string; // Database UUID
+    displayId?: string; // Structured ID (e.g. BK-20240101-ABCD)
     farmerName: string;
     phone: string;
     pincode: string;
@@ -21,6 +22,7 @@ export interface Booking {
 
 export interface Farmer {
     id: string;
+    displayId?: string; // FAM0001
     name: string;
     phone: string;
     pincode: string;
@@ -77,7 +79,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
             // Fetch farmers
             const { data: farmersData, error: farmersError } = await supabase
                 .from('farmers')
-                .select('*')
+                .select('*, displayId:display_id')
                 .order('created_at', { ascending: false });
 
             if (farmersError) throw farmersError;
@@ -88,6 +90,8 @@ export function BookingProvider({ children }: { children: ReactNode }) {
             if (jobsData) {
                 const farmerPhoneMap = new Map(currentFarmers.map(f => [f.phone, f.name]));
                 const farmerIdMap = new Map(currentFarmers.map(f => [f.id, f.name]));
+                // Also map displayId if needed later
+
 
                 const mappedBookings: Booking[] = jobsData.map((job: any) => {
                     let name = 'Unknown Farmer';
@@ -101,6 +105,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
 
                     return {
                         id: job.id,
+                        displayId: job.display_id || job.id.slice(0, 8).toUpperCase(), // Fallback
                         farmerName: name,
                         phone: job.farmer_phone,
                         pincode: job.pincode || '',
@@ -198,6 +203,14 @@ export function BookingProvider({ children }: { children: ReactNode }) {
                 // source: 'MANUAL',
                 status: 'pending'
             };
+
+            // Generate structured ID
+            const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+            const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+            const displayId = `BK-${dateStr}-${randomSuffix}`;
+
+            // @ts-ignore
+            jobPayload.display_id = displayId;
 
             const { error, data: insertedJob } = await supabase
                 .from('jobs')

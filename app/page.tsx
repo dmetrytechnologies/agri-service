@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth, UserRole } from '@/lib/auth-context';
-import { useRouter } from 'next/navigation';
-import { Smartphone, ArrowRight, UserPlus, LogIn, User, MapPin, Loader2 } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Smartphone, ArrowRight, UserPlus, LogIn, User, MapPin, Loader2, CheckCircle } from 'lucide-react';
 import ServiceAreaSelector from '@/components/ServiceAreaSelector';
 
 const TypingEffect = ({ text }: { text: string }) => {
@@ -48,6 +48,19 @@ export default function LoginPage() {
   const [pincode, setPincode] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    if (searchParams?.get('logout') === 'success') {
+      setSuccessMsg('Logged out successfully');
+      // Clear URL param without reload
+      window.history.replaceState({}, '', '/');
+      // Auto-hide after 3 seconds
+      const timer = setTimeout(() => setSuccessMsg(''), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [searchParams]);
 
   // Operator Specific State
   const [servicePincodes, setServicePincodes] = useState<string[]>([]);
@@ -348,6 +361,7 @@ export default function LoginPage() {
             </div>
 
             {error && <p className="text-sm text-red-600 bg-red-50/80 backdrop-blur-sm px-3 py-2 rounded-xl text-center border border-red-200">{error}</p>}
+            {successMsg && <p className="text-sm text-green-600 bg-green-50/80 backdrop-blur-sm px-3 py-2 rounded-xl text-center border border-green-200 flex items-center justify-center gap-2"><CheckCircle className="h-4 w-4" /> {successMsg}</p>}
 
             <button
               type="submit"

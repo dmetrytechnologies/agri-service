@@ -26,6 +26,7 @@ export default function AdminFarmersPage() {
     const { bookings, farmers: registeredFarmers, refreshData, isLoading: isBookingsLoading } = useBookings();
     const [searchTerm, setSearchTerm] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [selectedFarmer, setSelectedFarmer] = useState<any>(null);
 
     // Derived state logic
     const farmers = useMemo(() => {
@@ -35,6 +36,7 @@ export default function AdminFarmersPage() {
         registeredFarmers.forEach(rf => {
             uniqueFarmers.set(rf.phone, {
                 id: rf.id,
+                displayId: rf.displayId,
                 name: rf.name,
                 phone: rf.phone,
                 pincode: rf.pincode,
@@ -105,26 +107,37 @@ export default function AdminFarmersPage() {
         }
     };
 
-    const handleDeleteFarmer = async (phone: string, name: string) => {
+    const handleDeleteFarmer = async (phone: string, id: string | undefined, name: string) => {
         if (!confirm(`Are you sure you want to delete ${name}? This cannot be undone.`)) return;
 
         try {
             // 1. Delete associated jobs (bookings) first
+            // Try deleting by farmer_id OR farmer_phone to be safe
+            if (id) {
+                const { error: jobErrorId } = await supabase.from('jobs').delete().eq('farmer_id', id);
+                if (jobErrorId) console.warn("Error deleting jobs by ID:", jobErrorId);
+            }
             const { error: jobsError } = await supabase.from('jobs').delete().eq('farmer_phone', phone);
+
             if (jobsError) {
                 console.error("Error deleting farmer jobs:", jobsError);
-                // Continue to try deleting farmer even if jobs fail? 
-                // Better to throw effectively, but we want to be robust. 
-                // If permission denied on jobs, farmer delete might still work but they will reappear.
-                // Let's assume the improved policy handles both.
                 throw new Error("Failed to clean up farmer bookings.");
             }
 
             // 2. Delete the farmer record
-            const { error } = await supabase.from('farmers').delete().eq('phone', phone);
+            let error;
+            if (id) {
+                const res = await supabase.from('farmers').delete().eq('id', id);
+                error = res.error;
+            } else {
+                const res = await supabase.from('farmers').delete().eq('phone', phone);
+                error = res.error;
+            }
+
             if (error) throw error;
 
             await refreshData(); // Refresh list
+            setIsModalOpen(false); // Close modal if open
         } catch (error: any) {
             console.error("Error deleting farmer:", error);
             alert(`Failed to delete farmer: ${error.message || 'Unknown error'}`);
@@ -168,14 +181,20 @@ export default function AdminFarmersPage() {
                 ) : (
                     farmers.map((farmer: any) => (
                         <div key={farmer.phone} className="group relative">
-                            <div className="glass-card p-6 flex flex-col h-full hover:translate-y-[-4px] hover:shadow-xl hover:bg-white/30 transition-all duration-300">
+                            <div
+                                onClick={() => setSelectedFarmer(farmer)}
+                                className="glass-card p-6 flex flex-col h-full hover:translate-y-[-4px] hover:shadow-xl hover:bg-white/30 transition-all duration-300 cursor-pointer"
+                            >
                                 <div className="flex items-start justify-between mb-6">
                                     <div className="glass-icon-btn h-16 w-16 text-[var(--primary)] font-black text-2xl">
                                         {farmer.name.charAt(0)}
                                     </div>
                                     <div className="flex flex-col items-end gap-2">
                                         <button
-                                            onClick={() => handleDeleteFarmer(farmer.phone, farmer.name)}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleDeleteFarmer(farmer.phone, farmer.id, farmer.name);
+                                            }}
                                             className="p-2 text-red-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
                                             title="Delete Farmer"
                                         >
@@ -191,6 +210,7 @@ export default function AdminFarmersPage() {
                                 <div className="space-y-1 mb-6">
                                     <h3 className="text-xl font-black text-[var(--foreground)] leading-tight">{farmer.name}</h3>
                                     <div className="flex items-center gap-2 text-[var(--muted)] font-bold text-sm">
+                                        <span className="bg-white/10 px-1.5 py-0.5 rounded text-[10px] uppercase tracking-widest text-[var(--primary)] border border-white/5">{farmer.displayId || 'FAM---'}</span>
                                         <Smartphone className="h-3 w-3" /> {farmer.phone}
                                     </div>
                                 </div>
@@ -249,7 +269,7 @@ export default function AdminFarmersPage() {
             {isModalOpen && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={() => setIsModalOpen(false)} />
-                    <div className="relative glass-card w-full max-w-lg p-8 shadow-2xl animate-in zoom-in duration-300 bg-[var(--glass-bg)]">
+                    <div className="relative glass-card w-full max-w-lg p-8 shadow-2xl animate-in zoom-in duration-300 bg-[var(--glass-bg)] max-h-[90vh] overflow-y-auto custom-scrollbar">
                         <div className="flex justify-between items-center mb-8">
                             <div>
                                 <h2 className="text-2xl font-black text-[var(--foreground)] tracking-tight">Onboard Farmer</h2>
@@ -296,6 +316,65 @@ export default function AdminFarmersPage() {
                                 Confirm Registration
                             </button>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Farmer Details Modal */}
+            {selectedFarmer && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={() => setSelectedFarmer(null)} />
+                    <div className="relative glass-card w-full max-w-sm p-8 shadow-2xl animate-in zoom-in duration-300 bg-[var(--glass-bg)] overflow-y-auto max-h-[90vh] custom-scrollbar">
+                        <div className="flex flex-col items-center text-center mb-6">
+                            <div className="h-20 w-20 bg-[var(--primary)]/10 text-[var(--primary)] rounded-full flex items-center justify-center mb-4 border border-[var(--primary)]/20 shadow-inner">
+                                <span className="text-3xl font-black">{selectedFarmer.name.charAt(0)}</span>
+                            </div>
+                            <h2 className="text-2xl font-black text-[var(--foreground)] leading-tight">{selectedFarmer.name}</h2>
+                            <p className="text-xs font-black text-[var(--primary)] uppercase tracking-[0.2em] mt-1">{selectedFarmer.displayId || 'FAM---'}</p>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="h-8 w-8 rounded-lg bg-[var(--primary)]/20 flex items-center justify-center text-[var(--primary)]">
+                                        <Smartphone className="h-4 w-4" />
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-black text-[var(--muted)] uppercase tracking-widest">Phone</p>
+                                        <p className="font-bold text-[var(--foreground)]">{selectedFarmer.phone}</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <div className="h-8 w-8 rounded-lg bg-[var(--primary)]/20 flex items-center justify-center text-[var(--primary)]">
+                                        <MapPin className="h-4 w-4" />
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-black text-[var(--muted)] uppercase tracking-widest">Address</p>
+                                        <p className="font-bold text-[var(--foreground)] text-sm">{selectedFarmer.village}, {selectedFarmer.district}</p>
+                                        <p className="text-xs text-[var(--muted)]">{selectedFarmer.address} - {selectedFarmer.pincode}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button
+                                onClick={() => {
+                                    if (confirm(`Delete ${selectedFarmer.name}?`)) {
+                                        handleDeleteFarmer(selectedFarmer.phone, selectedFarmer.id, selectedFarmer.name);
+                                        setSelectedFarmer(null);
+                                    }
+                                }}
+                                className="w-full flex items-center justify-center gap-2 p-3 text-red-400 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all border border-red-500/20"
+                            >
+                                <Trash2 className="h-4 w-4" /> Delete Farmer
+                            </button>
+                        </div>
+
+                        <button
+                            onClick={() => setSelectedFarmer(null)}
+                            className="w-full glass-button glass-button-primary py-4 rounded-xl mt-6 shadow-xl"
+                        >
+                            Close Profile
+                        </button>
                     </div>
                 </div>
             )}

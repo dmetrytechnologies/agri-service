@@ -153,7 +153,7 @@ export default function AllBookingsPage() {
 
     const copyToWhatsApp = (booking: any) => {
         const text = `🚜 *Agri-Drone Assignment* 🚜\n\n` +
-            `*Booking ID:* ${booking.id}\n` +
+            `*Booking ID:* ${booking.displayId || booking.id}\n` +
             `*Farmer:* ${booking.farmerName}\n` +
             `*Contact:* ${booking.phone}\n` +
             `*Crop:* ${booking.crop}\n` +
@@ -171,7 +171,9 @@ export default function AllBookingsPage() {
     const filteredBookings = bookings.filter(b => {
         const matchesFilter = filter === 'All' || b.status === filter;
         const matchesSearch = b.farmerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            b.id.toLowerCase().includes(searchTerm.toLowerCase());
+            b.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (b.displayId && b.displayId.toLowerCase().includes(searchTerm.toLowerCase()));
+
 
         let matchesDate = true;
         if (dateFilter) {
@@ -328,7 +330,7 @@ export default function AllBookingsPage() {
 
             {/* Bookings Table */}
             <div className="glass-card p-0 overflow-hidden">
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto custom-scrollbar">
                     <table className="w-full text-left font-medium">
                         <thead className="bg-black/5 dark:bg-white/5 border-b border-white/10 text-xs uppercase text-[var(--muted)] font-black tracking-wider">
                             <tr>
@@ -354,9 +356,9 @@ export default function AllBookingsPage() {
                                                 <div className="flex items-center gap-2">
                                                     <button
                                                         onClick={() => setSelectedBooking(b)}
-                                                        className="font-black text-[var(--primary)] hover:underline decoration-2 underline-offset-4"
+                                                        className="font-black text-[var(--primary)] hover:underline decoration-2 underline-offset-4 text-xs md:text-sm"
                                                     >
-                                                        {b.id}
+                                                        {b.displayId || b.id.slice(0, 8).toUpperCase()}
                                                     </button>
                                                     <button
                                                         onClick={() => openEditModal(b)}
@@ -453,13 +455,14 @@ export default function AllBookingsPage() {
                 selectedBooking && (
                     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
                         <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={() => setSelectedBooking(null)} />
-                        <div className="relative w-full max-w-sm glass-card p-8 rounded-[2.5rem] shadow-2xl border border-white/20 animate-in zoom-in duration-300">
+                        <div className="relative w-full max-w-sm glass-card p-8 rounded-[2.5rem] shadow-2xl border border-white/20 animate-in zoom-in duration-300 max-h-[90vh] overflow-y-auto custom-scrollbar">
                             <div className="flex flex-col items-center text-center mb-6">
                                 <div className="h-16 w-16 bg-green-500/10 text-[var(--primary)] rounded-2xl flex items-center justify-center mb-4 border border-green-500/20">
                                     <ClipboardList className="h-8 w-8" />
                                 </div>
                                 <h2 className="text-2xl font-black text-[var(--foreground)] leading-tight">Booking Info</h2>
-                                <p className="text-xs font-black text-[var(--primary)] uppercase tracking-[0.2em] mt-1">{selectedBooking.id}</p>
+                                <h2 className="text-2xl font-black text-[var(--foreground)] leading-tight">Booking Info</h2>
+                                <p className="text-xs font-black text-[var(--primary)] uppercase tracking-[0.2em] mt-1">{selectedBooking.displayId || selectedBooking.id}</p>
                             </div>
 
                             <div className="space-y-4">
@@ -518,8 +521,8 @@ export default function AllBookingsPage() {
             {
                 isManualModalOpen && (
                     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-                        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsManualModalOpen(false)} />
-                        <div className="relative w-full max-w-md glass-card p-8 rounded-[2.5rem] shadow-2xl border border-white/20 animate-in zoom-in duration-300 max-h-[85vh] overflow-y-auto custom-scrollbar">
+                        <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={() => setIsManualModalOpen(false)} />
+                        <div className="relative w-full max-w-md glass-card p-8 rounded-[2.5rem] shadow-2xl border border-white/20 animate-in zoom-in duration-300 max-h-[90vh] overflow-y-auto custom-scrollbar">
                             <div className="flex justify-between items-center mb-6">
                                 <h2 className="text-2xl font-black text-[var(--foreground)] italic">{editingId ? 'Edit Booking' : 'Quick Booking'}</h2>
                                 <button
@@ -672,7 +675,7 @@ export default function AllBookingsPage() {
             {isAssignModalOpen && assigningBooking && (
                 <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={() => setIsAssignModalOpen(false)} />
-                    <div className="relative w-full max-w-2xl glass-card p-6 md:p-8 rounded-[2rem] shadow-2xl border border-white/20 animate-in zoom-in duration-300 max-h-[90vh] overflow-hidden flex flex-col">
+                    <div className="relative w-full max-w-2xl glass-card p-6 md:p-8 rounded-[2rem] shadow-2xl border border-white/20 animate-in zoom-in duration-300 max-h-[90vh] flex flex-col overflow-y-auto custom-scrollbar">
                         <div className="flex justify-between items-start mb-6">
                             <div>
                                 <h2 className="text-2xl font-black text-[var(--foreground)] italic">Assign Pilot</h2>
