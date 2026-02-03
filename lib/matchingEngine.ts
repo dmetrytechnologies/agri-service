@@ -12,7 +12,8 @@ export interface MatchingResult {
 
 export async function getPilotMatches(jobId: string): Promise<MatchingResult> {
     // 1. Fetch Job Details
-    const { data: job, error: jobError } = await supabase
+    console.log(`[MatchingEngine] Fetching job: ${jobId}`);
+    const { data: jobs, error: jobError } = await supabase
         .from('jobs')
         .select(`
             *,
@@ -22,12 +23,20 @@ export async function getPilotMatches(jobId: string): Promise<MatchingResult> {
                 district
             )
         `)
-        .eq('id', jobId)
-        .single();
+        .eq('id', jobId);
 
-    if (jobError || !job) {
-        throw new Error(jobError?.message || 'Job not found');
+    if (jobError) {
+        console.error('[MatchingEngine] Job fetch error:', jobError);
+        throw new Error(jobError.message);
     }
+
+    if (!jobs || jobs.length === 0) {
+        console.error('[MatchingEngine] Job not found:', jobId);
+        throw new Error('Job not found');
+    }
+
+    // Use the first match to avoid "Cannot coerce" errors if duplicates exist
+    const job = jobs[0];
 
     // Extract relevant data (handling nested farmers data or flat job data)
     const farmerVillage = job.village || job.farmers?.village;

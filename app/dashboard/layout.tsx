@@ -25,6 +25,7 @@ export default function DashboardLayout({
     const { user, logout, isLoading } = useAuth();
     const router = useRouter();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
 
     useEffect(() => {
         if (!isLoading && !user) {
@@ -114,11 +115,15 @@ export default function DashboardLayout({
                                 <p className="text-xs text-green-600 dark:text-[#52b788] font-bold uppercase tracking-wider">{user.role}</p>
                             </div>
                             <button
-                                onClick={logout}
-                                className="flex w-full items-center gap-3 px-4 py-2 text-red-600 hover:bg-red-50 dark:text-red-100 dark:hover:bg-red-500/20 dark:hover:text-white rounded-lg transition-all"
+                                onClick={async () => {
+                                    setIsLoggingOut(true);
+                                    await logout();
+                                }}
+                                disabled={isLoggingOut}
+                                className="flex w-full items-center gap-3 px-4 py-2 text-red-600 hover:bg-red-50 dark:text-red-100 dark:hover:bg-red-500/20 dark:hover:text-white rounded-lg transition-all disabled:opacity-70 disabled:cursor-not-allowed"
                             >
                                 <LogOut className="h-5 w-5" />
-                                <span className="font-medium">Logout</span>
+                                <span className="font-medium">{isLoggingOut ? 'See you soon...' : 'Logout'}</span>
                             </button>
                         </div>
                     </aside>
