@@ -154,7 +154,7 @@ export default function LoginPage() {
         if (!village || !district) throw new Error('Please fill distinct and village details');
       } else if (role === 'operator') {
         if (!address) throw new Error('Please enter your base location');
-        if (servicePincodes.length === 0 || serviceVillages.length === 0) throw new Error('Please add at least one service area with villages');
+        if (servicePincodes.length === 0 || serviceVillages.length === 0) throw new Error("Please add a service area. Enter Pincode -> Search -> Select Villages -> Click 'Add Villages' button.");
       }
 
       // Init Signup -> Stores data and triggers OTP
