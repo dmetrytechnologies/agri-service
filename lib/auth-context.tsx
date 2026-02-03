@@ -34,7 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
-    const SAFETY_TIMEOUT_MS = 3000;
+    const SAFETY_TIMEOUT_MS = 5000;
 
     // Safety timer: Ensure we stop loading eventually even if Supabase/Network hangs
     const safetyTimer = setTimeout(() => {
@@ -43,6 +43,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsLoading(false);
       }
     }, SAFETY_TIMEOUT_MS);
+
+    const initAuth = async () => {
+      try {
+        // Fast path: Check local session immediately
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user && mounted) {
+          const profile = await fetchProfile(session.user.id, session.user.phone!);
+          if (mounted) {
+            setUser(profile);
+            // If successful, we can unblock UI immediately
+            clearTimeout(safetyTimer);
+            setIsLoading(false);
+          }
+        }
+      } catch (e) {
+        console.error("Initial session check failed", e);
+      }
+    };
+
+    initAuth();
 
     // Subscribe to Auth Changes. This fires immediately with the current session state.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -55,10 +75,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (mounted) setUser(null);
       }
 
-      // Clear safety timer as we got a response
-      clearTimeout(safetyTimer);
-
-      if (mounted) setIsLoading(false);
+      // Ensure we clear loading state in all cases (if initAuth didn't yet)
+      if (isLoading) {
+        clearTimeout(safetyTimer);
+        if (mounted) setIsLoading(false);
+      }
     });
 
     return () => {
