@@ -33,39 +33,65 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
-    // Check active session
+    let mounted = true;
+
     const checkSession = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        console.log('Checking session...');
+        // Create a timeout promise to prevent infinite hanging
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Session check timeout')), 5000)
+        );
 
-        if (session?.user) {
-          // Authenticated, now fetch profile
+        // Race Supabase session check against timeout
+        const sessionPromise = supabase.auth.getSession();
+
+        const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]) as any;
+
+        if (session?.user && mounted) {
+          console.log('Session found, fetching profile...');
           const profile = await fetchProfile(session.user.id, session.user.phone!);
-          if (profile) {
+          if (profile && mounted) {
             setUser(profile);
           }
-        } else {
-          localStorage.removeItem('agri_user');
+        } else if (mounted) {
+          console.log('No session found, clearing local state.');
+          // Don't modify localStorage here blindly, rely on user action or explicit logout
+          // But cleaning up stale user data is good practice if we are sure
         }
       } catch (error) {
-        console.error('Session check error:', error);
+        console.error('Session check error or timeout:', error);
+        // On timeout or error, we default to no user, so login screen shows
       } finally {
-        setIsLoading(false);
+        if (mounted) {
+          // Force isLoading to false to unblock UI
+          console.log('Session check complete, setting isLoading false');
+          setIsLoading(false);
+        }
       }
     };
 
     checkSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // Avoid double-setting state if checkSession is actively running
+      // But we need to react to explicit events
+      console.log('Auth state change:', event);
       if (session?.user) {
+        // Only refetch if we don't have user or it's different?
+        // For simplicity, just fetch.
         const profile = await fetchProfile(session.user.id, session.user.phone!);
-        setUser(profile);
+        if (mounted) setUser(profile);
       } else {
-        setUser(null);
+        if (mounted) setUser(null);
       }
+      if (mounted) setIsLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const fetchProfile = async (authId: string, phone: string): Promise<User | null> => {
@@ -231,7 +257,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setUser(null);
     localStorage.removeItem('agri_user');
-    window.location.href = '/'; // Force a hard refresh to clear all application state
+    router.push('/');
   };
 
   return (

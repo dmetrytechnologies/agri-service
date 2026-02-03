@@ -49,6 +49,7 @@ export default function DashboardLayout({
         </Link>
     );
 
+
     return (
         <OperatorProvider>
             <BookingProvider>
@@ -66,10 +67,10 @@ export default function DashboardLayout({
 
                     {/* Sidebar Navigation */}
                     <aside className={`
-                fixed md:sticky top-[57px] md:top-0 left-0 h-[calc(100vh-57px)] md:h-screen w-64 
-                bg-white dark:bg-black/95 dark:backdrop-blur-xl border-r border-gray-200 dark:border-white/10
+                fixed md:sticky top-[57px] md:top-0 right-0 md:left-0 h-[calc(100vh-57px)] md:h-screen w-64 
+                bg-white dark:bg-black/95 dark:backdrop-blur-xl border-l md:border-r border-gray-200 dark:border-white/10
                 transform transition-all duration-300 ease-in-out z-50
-                ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0
+                ${isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'} md:translate-x-0
                 flex flex-col shadow-xl text-gray-900 dark:text-white
             `}>
                         <div className="hidden md:flex items-center gap-2 p-6 font-bold text-xl text-center border-b border-gray-200 dark:border-white/10">
