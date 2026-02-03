@@ -519,7 +519,7 @@ export default function AllBookingsPage() {
                 isManualModalOpen && (
                     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
                         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsManualModalOpen(false)} />
-                        <div className="relative w-full max-w-md glass-card p-8 rounded-[2.5rem] shadow-2xl border border-white/20 animate-in zoom-in duration-300">
+                        <div className="relative w-full max-w-md glass-card p-8 rounded-[2.5rem] shadow-2xl border border-white/20 animate-in zoom-in duration-300 max-h-[85vh] overflow-y-auto custom-scrollbar">
                             <div className="flex justify-between items-center mb-6">
                                 <h2 className="text-2xl font-black text-[var(--foreground)] italic">{editingId ? 'Edit Booking' : 'Quick Booking'}</h2>
                                 <button

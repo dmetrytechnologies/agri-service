@@ -75,7 +75,7 @@ export async function getPilotMatches(jobId: string, supabaseClient?: any): Prom
 
     const seenIds = new Set<string>();
 
-    const categorizedPilots = (activePilots || []).map(p => {
+    const categorizedPilots = (activePilots || []).map((p: Operator) => {
         const hasVillage = farmerVillage && p.service_villages?.some((v: string) => v.toLowerCase() === farmerVillage.toLowerCase());
         const hasPincode = farmerPincode && p.service_pincodes?.includes(farmerPincode);
         const hasDistrict = farmerDistrict && p.district?.toLowerCase() === farmerDistrict.toLowerCase();
@@ -85,7 +85,7 @@ export async function getPilotMatches(jobId: string, supabaseClient?: any): Prom
     });
 
     // Priority 1: Village + Date Match
-    categorizedPilots.forEach(p => {
+    categorizedPilots.forEach((p: any) => {
         if (p.hasVillage && p.availableDate && !seenIds.has(p.id)) {
             results.perfectMatches.push(p);
             seenIds.add(p.id);
@@ -93,7 +93,7 @@ export async function getPilotMatches(jobId: string, supabaseClient?: any): Prom
     });
 
     // Priority 2: Village Match (Date Flexible)
-    categorizedPilots.forEach(p => {
+    categorizedPilots.forEach((p: any) => {
         if (p.hasVillage && !seenIds.has(p.id)) {
             results.villageMatches.push(p);
             seenIds.add(p.id);
@@ -101,7 +101,7 @@ export async function getPilotMatches(jobId: string, supabaseClient?: any): Prom
     });
 
     // Priority 3: Pincode + Date Match
-    categorizedPilots.forEach(p => {
+    categorizedPilots.forEach((p: any) => {
         if (p.hasPincode && p.availableDate && !seenIds.has(p.id)) {
             results.pincodePerfectMatches.push(p);
             seenIds.add(p.id);
@@ -109,7 +109,7 @@ export async function getPilotMatches(jobId: string, supabaseClient?: any): Prom
     });
 
     // Priority 4: Pincode Match (Date Flexible)
-    categorizedPilots.forEach(p => {
+    categorizedPilots.forEach((p: any) => {
         if (p.hasPincode && !seenIds.has(p.id)) {
             results.pincodeMatches.push(p);
             seenIds.add(p.id);
@@ -117,7 +117,7 @@ export async function getPilotMatches(jobId: string, supabaseClient?: any): Prom
     });
 
     // Priority 5: District Match
-    categorizedPilots.forEach(p => {
+    categorizedPilots.forEach((p: any) => {
         if (p.hasDistrict && !seenIds.has(p.id)) {
             results.districtMatches.push(p);
             seenIds.add(p.id);
