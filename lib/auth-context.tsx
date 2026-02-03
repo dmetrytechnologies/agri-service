@@ -120,6 +120,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return true;
     } catch (error: any) {
       console.error('Login error:', error.message);
+      if (error.message && error.message.includes('unverified') && error.message.includes('Trial account')) {
+        throw new Error('Twilio Trial: Number not verified. Verify in Twilio Console or use a Supabase Test Number.');
+      }
       throw error;
     }
   };
@@ -132,7 +135,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         type: 'sms'
       });
 
-      if (error) throw error;
+      if (error) {
+        // Handle common OTP errors more gracefully
+        if (error.message.includes('Token has expired') || error.message.includes('invalid')) {
+          throw new Error('Invalid or Expired OTP. Please use the most recent code sent to your phone.');
+        }
+        throw error;
+      }
       if (data.session?.user) {
         const userId = data.session.user.id;
         const sessionPhone = data.session.user.phone || phone; // Use authenticated phone from session if available
