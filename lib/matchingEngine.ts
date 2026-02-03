@@ -10,10 +10,12 @@ export interface MatchingResult {
     manual: Operator[];              // Priority 6: Manual Override
 }
 
-export async function getPilotMatches(jobId: string): Promise<MatchingResult> {
+export async function getPilotMatches(jobId: string, supabaseClient?: any): Promise<MatchingResult> {
+    const sb = supabaseClient || supabase;
+
     // 1. Fetch Job Details
     console.log(`[MatchingEngine] Fetching job: ${jobId}`);
-    const { data: jobs, error: jobError } = await supabase
+    const { data: jobs, error: jobError } = await sb
         .from('jobs')
         .select(`
             *,
@@ -45,7 +47,7 @@ export async function getPilotMatches(jobId: string): Promise<MatchingResult> {
     const preferredDate = job.preferred_date;
 
     // 2. Fetch All Active Pilots
-    const { data: pilots, error: pilotsError } = await supabase
+    const { data: pilots, error: pilotsError } = await sb
         .from('operators')
         .select('*')
         .eq('status', 'Idle'); // Assuming only Idle pilots can be matched automatically? Or all except Off-Duty?
@@ -53,7 +55,7 @@ export async function getPilotMatches(jobId: string): Promise<MatchingResult> {
 
     // Re-fetch with a broader filter to include In-Field but active pilots if needed
     // Actually, let's fetch all except 'Off-Duty' as per rule "pilot is active"
-    const { data: activePilots, error: activePilotsError } = await supabase
+    const { data: activePilots, error: activePilotsError } = await sb
         .from('operators')
         .select('*')
         .neq('status', 'Off-Duty');
