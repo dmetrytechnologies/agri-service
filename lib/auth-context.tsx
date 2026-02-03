@@ -272,35 +272,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const checkUserExists = async (phone: string) => {
     try {
-      const [adminRes, opRes, farmerRes] = await Promise.all([
-        supabase.from('admins').select('id').eq('phone', phone).maybeSingle(),
-        supabase.from('operators').select('id').eq('phone', phone).maybeSingle(),
-        supabase.from('farmers').select('id').eq('phone', phone).maybeSingle()
+      if (!phone) return false;
+      const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+
+      console.log('Checking existence for:', cleanPhone);
+
+      // Timeout wrapper to prevent hanging
+      const dbCheck = Promise.all([
+        supabase.from('admins').select('id').eq('phone', cleanPhone).maybeSingle(),
+        supabase.from('operators').select('id').eq('phone', cleanPhone).maybeSingle(),
+        supabase.from('farmers').select('id').eq('phone', cleanPhone).maybeSingle()
       ]);
 
-      if (adminRes.data || opRes.data || farmerRes.data) return true;
+      const timeout = new Promise<any>((_, reject) =>
+        setTimeout(() => reject(new Error('Request timed out')), 8000)
+      );
+
+      const [adminRes, opRes, farmerRes] = await Promise.race([dbCheck, timeout]) as any[];
+
+      if (adminRes?.error) console.error('Admin check error:', adminRes.error);
+      if (opRes?.error) console.error('Operator check error:', opRes.error);
+      if (farmerRes?.error) console.error('Farmer check error:', farmerRes.error);
+
+      if (adminRes?.data || opRes?.data || farmerRes?.data) return true;
       return false;
     } catch (error) {
+      console.error('checkUserExists failed:', error);
+      // If it's a timeout or network error, we might default to FALSE to allow them to TRY signing up,
+      // or return FALSE so they get "User not found" (which is better than hanging).
       return false;
     }
   };
+};
 
-  const logout = async () => {
-    try {
-      await supabase.auth.signOut();
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
-    setUser(null);
-    localStorage.removeItem('agri_user');
-    router.push('/?logout=success');
-  };
+const logout = async () => {
+  try {
+    await supabase.auth.signOut();
+  } catch (error) {
+    console.error('Logout error:', error);
+  }
+  setUser(null);
+  localStorage.removeItem('agri_user');
+  router.push('/?logout=success');
+};
 
-  return (
-    <AuthContext.Provider value={{ user, login, verifyOtp, signUp, logout, checkUserExists, isLoading }}>
-      {children}
-    </AuthContext.Provider>
-  );
+return (
+  <AuthContext.Provider value={{ user, login, verifyOtp, signUp, logout, checkUserExists, isLoading }}>
+    {children}
+  </AuthContext.Provider>
+);
 }
 
 export function useAuth() {
