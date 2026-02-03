@@ -39,28 +39,20 @@ async function checkPerf() {
 
     const start = Date.now();
 
-    console.log('--- Individual Queries ---');
+    console.log('--- RPC Query Check ---');
+    const t_rpc = Date.now();
+    const { data, error } = await supabase.rpc('get_user_profile', { phone_input: cleanPhone });
 
-    const t1 = Date.now();
-    const { error: err1 } = await supabase.from('admins').select('id').eq('phone', cleanPhone).maybeSingle();
-    console.log(`Admins query: ${Date.now() - t1}ms ${err1 ? '(Error)' : ''}`);
+    console.log(`RPC Time: ${Date.now() - t_rpc}ms`);
 
-    const t2 = Date.now();
-    const { error: err2 } = await supabase.from('operators').select('id').eq('phone', cleanPhone).maybeSingle();
-    console.log(`Operators query: ${Date.now() - t2}ms ${err2 ? '(Error)' : ''}`);
-
-    const t3 = Date.now();
-    const { error: err3 } = await supabase.from('farmers').select('id').eq('phone', cleanPhone).maybeSingle();
-    console.log(`Farmers query: ${Date.now() - t3}ms ${err3 ? '(Error)' : ''}`);
-
-    console.log('--- Parallel Queries (Promise.all) ---');
-    const tp_start = Date.now();
-    await Promise.all([
-        supabase.from('admins').select('id').eq('phone', cleanPhone).maybeSingle(),
-        supabase.from('operators').select('id').eq('phone', cleanPhone).maybeSingle(),
-        supabase.from('farmers').select('id').eq('phone', cleanPhone).maybeSingle()
-    ]);
-    console.log(`Total Parallel Time: ${Date.now() - tp_start}ms`);
+    if (error) {
+        console.error('RPC Error:', error);
+        console.log('Suggestion: Did you run the "optimizations_2026_02_04.sql" migration in Supabase?');
+    } else {
+        console.log('RPC Result:', data);
+        if (!data) console.log('User not found (or data is null)');
+        else console.log('User found:', data.name, data.role);
+    }
 }
 
 checkPerf();
