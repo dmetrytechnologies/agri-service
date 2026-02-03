@@ -125,7 +125,7 @@ export async function getPilotMatches(jobId: string, supabaseClient?: any): Prom
     });
 
     // Priority 6: Manual Override (Any active pilot)
-    categorizedPilots.forEach(p => {
+    categorizedPilots.forEach((p: any) => {
         if (!seenIds.has(p.id)) {
             results.manual.push(p);
             seenIds.add(p.id);
