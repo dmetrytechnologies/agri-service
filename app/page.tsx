@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useAuth, UserRole } from '@/lib/auth-context';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Smartphone, ArrowRight, UserPlus, LogIn, User, MapPin, Loader2, CheckCircle } from 'lucide-react';
@@ -30,7 +30,7 @@ const TypingEffect = ({ text }: { text: string }) => {
 
 
 
-export default function LoginPage() {
+function LoginContent() {
   const { user, login, verifyOtp, signUp, checkUserExists, isLoading } = useAuth();
   const router = useRouter();
   const [mode, setMode] = useState<'login' | 'signup'>('login');
